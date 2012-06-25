@@ -1,9 +1,55 @@
+import network_utilities
 
 def main():
-    import network_utilities
     module_file = "modules.txt"
     g =  network_utilities.create_network_from_sif_file("../data/interactions.sif")
     get_modules_of_graph(g, "mcl", output_file=module_file, inflation=1.7)
+    return
+
+#! Below two function need to be checked
+def get_seeds_from_node_scores_file(node_scores_file, default_non_seed_score):
+    nodes, dummy, initial_node_to_score, dummy = network_utilities.get_nodes_and_edges_from_sif_file(file_name = node_scores_file, store_edge_type = False)
+    seeds = set()
+    for node in initial_node_to_score:
+	if initial_node_to_score[node] > default_non_seed_score:
+	    seeds.add(node)
+    return seeds, nodes
+
+
+def score_mcl(node_scores_file, network_file, output_scores_file, module_file, default_non_seed_score):
+    g = network_utilities.create_network_from_sif_file(network_file, use_edge_data=True)
+    #modules = get_modules_of_graph(g, "mcl", inflation=2) # if edge weight based clustering is desired
+    seeds, nodes = get_seeds_from_node_scores_file(node_scores_file, default_non_seed_score)
+    modules = get_modules_from_file(module_file)
+    f = open(output_scores_file, 'w')
+    node_to_score = {}
+    #selected = set()
+    for module in modules:
+	module = set(module)
+	#common = module&seeds
+	#if 100*float(len(common))/len(module) > threshold:
+	    #selected |= module
+	#score = float(len(common))/len(module)
+	#n = len(module)-len(common)
+	#if n == 0:
+	#    continue
+	#score = 1.0/n
+	for node in module:
+	    #node_to_score[node] = score
+	    neighbors = set(g.neighbors(node))
+	    common = neighbors & module
+	    if node in common:
+		common.remove(node)
+	    #if len(common) == 0:
+	    #	continue
+	    score = float(len(common&seeds)) / len(module)
+	    node_to_score[node] = score
+    for node in nodes:
+	if node in node_to_score:
+	    f.write("%s\t%f\n" % (node, node_to_score[node]))
+	else:
+	    f.write("%s\t0.0\n" % node)
+    f.close()
     return
 
 def get_modules_from_file(output_file):

@@ -159,7 +159,7 @@ def analyze_network(g, out_file = None, seeds = None, calculate_radius = False):
     # print networkx.info(g) # currently buggy but fixed in the next version of networkx
     out_method("(V,E): %d %d\n" % (g.number_of_nodes(), g.number_of_edges()))
     out_method("V/E: %f\n" % (int(g.number_of_nodes()) / float(g.number_of_edges())))
-    degrees = g.degree() 
+    degrees = g.degree().values()
     degrees.sort()
     out_method("Average degree: %f\n" % float(sum(degrees)/float(len(degrees))))
     out_method("Most connected 20 nodes: %s\n" % degrees[-20:])
@@ -902,11 +902,91 @@ def create_ARFF_network_metrics_file(g, node_to_score, seeds, arff_file_name, ca
     f.close()
     return
 
+def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), ups = set(), downs = set(), draw_type = "all"):
+    """
+    roots seeds
+    remove seed-seed interactions
+    colors ups and downs
+    """
+    #g = create_network_from_sif_file(network_file)
+    f = open(output_file, 'w')
+    f.write("graph %s {\nforcelabels=false;\noutputorder=edgesfirst\n" % "converted")
+    #f.write("NA [style=invis];\n")
+    #seeds = set(seed_to_desc.keys()) #set([ line.strip() for line in open(seed_file) ])
+    
+    linkers = set()
+    for node in g.nodes():
+	common = set(g.neighbors(node))&seeds
+	if len(common) > 1: 
+	    linkers.add(node)
+	    for i, seed1 in enumerate(common):
+		for j, seed2 in enumerate(common):
+		    if i<j:
+			print node_to_desc[seed1], node_to_desc[node], node_to_desc[seed2]
+    #print linkers
+
+    if draw_type == "linker annotated":
+	for node in g.nodes():
+	    if len(set(g.neighbors(node))&seeds) > 1:
+		if node in seeds:
+		    f.write("%s [label=\"\" fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		else:
+		    f.write("%s [label=\"\" color=green height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	    else:
+		if node in seeds:
+		    f.write("%s [label=\"\" fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		else:
+		    f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	ignored = set()
+    elif draw_type == "linker_only":
+	for node in g.nodes():
+	    if node in seeds:
+		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	    elif node in linkers: 
+		if node in ups: 
+		    f.write("%s [label=\"\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		elif node in downs:
+		    f.write("%s [label=\"\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		else:
+		    f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	ignored = ((set(g.nodes()) - seeds) - linkers) 
+    elif draw_type == "regulated_only":
+	for node in g.nodes():
+	    if node in seeds:
+		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	    elif node in ups: 
+		f.write("%s [label=\"%s\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	    elif node in downs:
+		f.write("%s [label=\"%s\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	ignored = ((set(g.nodes()) - seeds) - ups) - downs 
+    elif draw_type == "all":
+	for node in g.nodes():
+	    if node in seeds:
+		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	    elif node in ups: 
+		f.write("%s [label=\"\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	    elif node in downs:
+		f.write("%s [label=\"\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	    else:
+		f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	ignored = set()
+
+    for u,v in g.edges_iter():
+	if u in seeds and v in seeds:
+	    continue
+	if u in ignored or v in ignored:
+	    continue
+	f.write("%s -- %s [color=blue];\n" % (u, v))
+    f.write("}\n")
+    f.close()
+    #os.system("dot %s -Tgif > %s.gif" % (dot_fname, dot_fname))
+    return
+
 
 if __name__ == "__main__":
     main()
-    return
 
+    """
     test_network = networkx.Graph()
     test_network.add_nodes_from([1,2,3,4,5,6,7,8,9])
     test_network.add_edges_from([(1,2),(1,3),(1,5),(2,6),(3,4),(5,6),(4,7),(7,8)]) # (1,4)
@@ -941,5 +1021,6 @@ if __name__ == "__main__":
     randomn = randomize_graph(graph=test_power_graph, randomization_type="preserve_topology_and_node_degree")   
     print "randomizing by preserve_degree_distribution..."
     randomn = randomize_graph(graph=test_power_graph, randomization_type="preserve_degree_distribution")
+    """
 
 

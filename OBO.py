@@ -2,7 +2,7 @@
 class OBO(object):
 
     def __init__(self, file_name, save_synonyms = False):
-	from Parsers import OboParser
+	import OboParser
 	self.g = OboParser.getOboGraph(file_name, save_synonyms)
 	self.precalculated_descendants = {}
 	self.child_to_parent = None

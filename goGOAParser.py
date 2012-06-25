@@ -55,7 +55,7 @@ class GOGOAParser(object):
 		continue
 
 	    if db_name not in self.db_name_to_biana_name:
-		print "Warning: xref db name is not recognized:", db_name
+		#print "Warning: xref db name is not recognized:", db_name
 		db_name = None
 	    else:
 		db_name = self.db_name_to_biana_name[db_name]

@@ -21,6 +21,9 @@ class Relationship:
             self.type = "synonym" # synonym
             self.id = temp.group(1) # synonymous term
             self.name = temp.group(2) # synonym type
+	elif tag_line.startswith("subset"):
+	    self.type = "subset"
+	    self.subset = tag_line.split(' ')[1]
 	else:
 	    self.type = "ignore"
         
@@ -43,8 +46,11 @@ def getOboGraph(fname, save_synonyms = False):
             # Expect Name in the next line
             name = obo_file.next().strip()[6:]
             obo.add_node(id)
+	    # Expect Namespace in the next line
+            namespace = obo_file.next().strip()[11:]
             # Legible Name
             obo.node[id]['n'] = name
+            obo.node[id]['t'] = namespace
             # Number of Arrays
             obo.node[id]['w'] = 0
             # Diff Express Genes
@@ -60,6 +66,10 @@ def getOboGraph(fname, save_synonyms = False):
                 stanza = Relationship(stanza, save_synonyms)
 		#try:                
 		if stanza.type == "ignore":
+		    continue
+		if stanza.type == "subset":
+		    if stanza.subset == "goslim_yeast":
+			obo.node[id]['y'] = True
 		    continue
 		if save_synonyms and stanza.type == "synonym":
 		    obo.node[id].setdefault('s', set()).add(stanza.id)
