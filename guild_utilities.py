@@ -1,10 +1,11 @@
 
-from toolbox import network_utilities, file_converter
+from toolbox import network_utilities, file_converter, stat_utilities
 import os
 
 def main():
     network_file = "/home/emre/arastirma/data/collaboration/billur/9606/network_no_tap_geneid.sif"
-    seed_file = "/home/emre/arastirma/data/collaboration/billur/brain_seeds_geneid.txt"
+    #seed_file = "/home/emre/arastirma/data/collaboration/billur/brain_seeds_geneid.txt"
+    seed_file = "/home/emre/arastirma/data/collaboration/billur/lung_seeds_geneid.txt"
     scoring_folder = "./test/"
     executable_dir = "/home/emre/arastirma/netzcore/src/"
     prepare_scoring(network_file, seed_file, scoring_folder, non_seed_score=0.01, seed_score=1.0, edge_score=1.0, n_sample=100, delim=" ")
@@ -163,7 +164,7 @@ def score_combined(scores_file_list, output_scores_file, combination_type="stand
 		score = 999999 # hard coded score to correspond infinity in func. flow
 	    node_to_score_inner[node] = score
 	if combination_type == "standard":
-	    mean, sigma = calculate_mean_and_sigma.calc_mean_and_sigma(node_to_score_inner.values())
+	    mean, sigma = stat_utilities.calc_mean_and_sigma(node_to_score_inner.values())
 	    for node, score in node_to_score_inner.iteritems():
 		if sigma == 0:
 		    if score-mean == 0:
@@ -218,17 +219,32 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
 	    new_pvalues[i] = (n/(rank+1)) * pvalue
     return new_pvalues
 
-def get_significance_among_node_scores(node_to_score, seeds, random_seed=1234):
-    from random import shuffle, seed
-    from numpy import array
-    seed(random_seed) # if None current system time is used
-    scores = [ score for node, score in node_to_score.iteritems() if node not in seeds ]
-    shuffle(scores)
-    selected = array(scores[:1000])
+def get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=None, seeds=None, random_seed=None):
+    from random import randint, shuffle, seed
     node_to_significance = {}
-    for node, score in node_to_score.iteritems():
-	n = (selected >= score).sum()
-	node_to_significance[node] = n/1000.0
+    if with_replacement:
+	# 10000 times selects a node from network and checks how many of these cases 
+	# the selected node has a score greater or equal to node in concern
+	scores = background_to_score.values()
+	size = len(scores)-1
+	for node, score in node_to_score.iteritems():
+	    n = 0
+	    for i in xrange(10000): 
+		selected = scores[randint(0,size)]
+		if selected >= score:
+		    n += 1
+	    node_to_significance[node] = n/10000.0
+    else:
+	# Selects 1000 nodes and checks how many of them has a score 
+	# greater or equal to node in concern
+	from numpy import array
+	seed(random_seed) # if None current system time is used
+	scores = [ score for node, score in node_to_score.iteritems() if node not in seeds ]
+	shuffle(scores)
+	selected = array(scores[:1000])
+	for node, score in node_to_score.iteritems():
+	    n = (selected >= score).sum()
+	    node_to_significance[node] = n/1000.0
     return node_to_significance
 
 def get_node_to_description(node_mapping_file, network_file):
@@ -254,26 +270,38 @@ def get_node_to_score(score_file):
     nodes, dummy, node_to_score, dummy = network_utilities.get_nodes_and_edges_from_sif_file(file_name = score_file, store_edge_type = False)
     return node_to_score
 
-def get_top_nodes(score_file, seed_file, exclude_seeds=False):
-    from numpy import mean, std
-
+def get_top_nodes(score_file, selection_type="pvalue", background_score_file=None, seed_file=None, exclude_seeds=False):
     top_nodes = set() 
     node_to_score = get_node_to_score(score_file)
-    seeds = get_nodes(seed_file)
-    values = []
-    for node, score in node_to_score.iteritems():
-	if node not in seeds:
-	    values.append((score, node))
-	else: # include only seeds that are in the network
-	    if exclude_seeds == False:
-		top_nodes.add(node)
-    m = mean(zip(*values)[0])
-    s = std(zip(*values)[0])
+    if selection_type == "2sigma":
+	from numpy import mean, std
+	seeds = get_nodes(seed_file)
+	values = []
+	for node, score in node_to_score.iteritems():
+	    if node not in seeds:
+		values.append((score, node))
+	    else: # include only seeds that are in the network
+		if exclude_seeds == False:
+		    top_nodes.add(node)
+	m = mean(zip(*values)[0])
+	s = std(zip(*values)[0])
 
-    for score, node in values:
-	val = (score - m) / s
-	if val >= 2.0:
-	    top_nodes.add(node)
+	for score, node in values:
+	    val = (score - m) / s
+	    if val >= 2.0:
+		top_nodes.add(node)
+    elif selection_type == "pvalue":
+	background_to_score = get_node_to_score(background_score_file)
+	node_to_significance = get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=background_to_score)
+	pvalues = [ (val, node) for node, val in node_to_significance.iteritems() ]
+	new_pvalues = correct_pvalues_for_multiple_testing(zip(*pvalues)[0])
+	i = 0
+	for node, val in node_to_significance.iteritems():
+	    if new_pvalues[i] <= 0.05:
+		top_nodes.add(node)
+	    i += 1
+    else:
+	raise ValueError("Invalid selection type!")
     return top_nodes
 
 
