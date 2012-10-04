@@ -37,7 +37,7 @@ MAX_NUMBER_OF_TRIAL = 6
 
 def main():
     g = create_network_from_sif_file("interactions.sif")
-    degrees = g.degree(with_labels=True)
+    degrees = g.degree()
     node_to_values = get_node_degree_related_values(g, ["v2","v3"])
     for v in g.nodes():
 	print v, degrees[v], node_to_values[v]
@@ -103,6 +103,16 @@ def get_subgraph(G, nodes):
     """
     return G.subgraph(nodes)
 
+def get_neighborhood_subgraph(g, nodes):
+    """
+	Returns the subgraph induced by the given nodes and their neighbors
+    """
+    neighbors = []
+    for node in nodes:
+	neighbors.extend(g.neighbors(node))
+	neighbors.extend(nodes)
+	g_sub = g.subgraph(neighbors)
+    return g_sub
 
 def get_connected_components(G, return_as_graph_list=True):
     """
@@ -128,7 +138,7 @@ def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, del
     if use_edge_data:
 	for e,w in dictEdge.iteritems():
 	    u,v = e
-	    g.add_edge(u,v,w)
+	    g.add_edge(u,v,{'w':w})
     else:
 	g.add_edges_from(setEdge)
     return g
@@ -138,7 +148,7 @@ def output_network_in_sif(g, output_file_name, delim = " ", include_unconnected=
     f = open(output_file_name, 'w')
     included_nodes = set()
     for u,v in g.edges_iter():
-	f.write("%s%s%s%s%s\n" % (u, delim, g.get_edge(u,v), delim, v) )
+	f.write("%s%s%s%s%s\n" % (u, delim, g.get_edge_data(u,v)['w'], delim, v) )
 	included_nodes.add(u)
 	included_nodes.add(v)
     if include_unconnected:
@@ -232,7 +242,7 @@ def get_node_degree_related_values(g, seeds):
 
 def filter_network(g, degree_threshold=None, largest_connected_component=True):
     print "V,E:", g.number_of_nodes(), g.number_of_edges()
-    degrees = g.degree(with_labels=True)
+    degrees = g.degree()
     subgraph_nodes = []
     for id, d in degrees.iteritems():
 	if degree_threshold is None or d <= degree_threshold:
@@ -368,7 +378,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 		edge_org = available_edges.pop()
 		if debug:
 		    print "From random:", (edge[0], edge[1])
-		new_graph.add_edge(edge[0], edge[1], graph.get_edge(edge_org[0], edge_org[1]))
+		new_graph.add_edge(edge[0], edge[1], graph.get_edge_data(edge_org[0], edge_org[1]))
 	    # If the random model added too many edges
 	    else:
 		if debug:
@@ -385,7 +395,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
                 target_id = random.choice(nodes)
 	    if debug:
 		print "Adding:", (source_id, target_id)
-	    new_graph.add_edge(source_id, target_id, graph.get_edge(edge_org[0], edge_org[1]))
+	    new_graph.add_edge(source_id, target_id, graph.get_edge_data(edge_org[0], edge_org[1]))
 	return new_graph
 
     if randomization_type == "barabasi_albert":
@@ -399,7 +409,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 	    new_graph = networkx.create_empty_copy(graph) 
 
 	available_edges = graph.edges() 
-	degree_map = networkx.degree(new_graph, with_labels=True)
+	degree_map = networkx.degree(new_graph)
 	nodes = new_graph.nodes()
 
 	# Map graph from random model to new graph
@@ -408,7 +418,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 		edge_org = available_edges.pop()
 		if debug:
 		    print "From random:", (edge[0], edge[1])
-		new_graph.add_edge(edge[0], edge[1], graph.get_edge(edge_org[0], edge_org[1]))
+		new_graph.add_edge(edge[0], edge[1], graph.get_edge_data(edge_org[0], edge_org[1]))
 	    # If the random model added too many edges
 	    else:
 		nodes_to_select = [ id for id, d in degree_map.items() for j in xrange(d+1) ]
@@ -430,7 +440,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 		target_id = random.choice(nodes_to_select)
 	    if debug:
 		print "Adding:", (source_id, target_id)
-	    new_graph.add_edge(source_id, target_id, graph.get_edge(edge_org[0], edge_org[1]))
+	    new_graph.add_edge(source_id, target_id, graph.get_edge_data(edge_org[0], edge_org[1]))
 	    degree_map[source_id] += 1 
 	    degree_map[target_id] += 1 
 
@@ -447,18 +457,18 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
             while new_graph.has_edge(source_id, target_id) or (not allow_self_edges and source_id == target_id):
                 source_id = random.choice(nodes)
                 target_id = random.choice(nodes)
-            new_graph.add_edge(source_id, target_id, graph.get_edge(edge[0],edge[1]))
+            new_graph.add_edge(source_id, target_id, graph.get_edge_data(edge[0],edge[1]))
         
     elif randomization_type=="preserve_topology": # shuffle_nodes
         nodes = graph.nodes()
         random_nodes = graph.nodes()
         random.shuffle(random_nodes)
         equivalences = dict([(nodes[i],random_nodes[i]) for i in xrange(len(nodes))])
-        new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]],graph.get_edge(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
+        new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]],graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
 
     elif randomization_type=="preserve_topology_and_node_degree": # shuffle_nodes_within_same_degree
-        nodes_by_degree = dict( (degree,[]) for degree in graph.degree() )
-        graph_degree = graph.degree(with_labels=True)
+        nodes_by_degree = dict( (degree,[]) for degree in graph.degree().values() )
+        graph_degree = graph.degree()
         [ nodes_by_degree[graph_degree[node]].append(node) for node in graph_degree ]
         equivalences = {}
         for current_degree in nodes_by_degree.keys():
@@ -466,16 +476,16 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
             random_nodes = list(nodes)
             random.shuffle(random_nodes)
             equivalences.update(dict([(nodes[i],random_nodes[i]) for i in xrange(len(nodes))]))
-        new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]], graph.get_edge(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
+        new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]], graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
         
     elif randomization_type=="preserve_degree_distribution":
         ## add edges as well
         for current_node1, current_node2 in graph.edges():
-            new_graph.add_edge(current_node1, current_node2, graph.get_edge(current_node1, current_node2))
-        max_degree = sorted(graph.degree())[-1]
-        #nodes_by_degree = dict( (degree,{}) for degree in graph.degree() )
+            new_graph.add_edge(current_node1, current_node2, graph.get_edge_data(current_node1, current_node2))
+        max_degree = sorted(graph.degree().values())[-1]
+        #nodes_by_degree = dict( (degree,{}) for degree in graph.degree().values() )
         nodes_by_degree = dict( (degree,{}) for degree in xrange(max_degree+1) )
-        graph_degree = graph.degree(with_labels=True)
+        graph_degree = graph.degree()
         [ nodes_by_degree[graph_degree[node]].setdefault(node) for node in graph_degree ]
         #print new_graph.nodes(), new_graph.edges()
         #print nodes_by_degree
@@ -517,7 +527,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
                     continue
 		if debug:
 		    print "rm %d %d" % (source_id, target_id)
-                edge_data = new_graph.get_edge(source_id, target_id)
+                edge_data = new_graph.get_edge_data(source_id, target_id)
                 new_graph.delete_edge(source_id, target_id)
 		if debug:
 		    print "add %d %d" % (new_source_id, new_target_id)
@@ -532,9 +542,9 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
     elif randomization_type=="preserve_degree_distribution_and_node_degree":
         ## add edges as well
         for current_node1, current_node2 in graph.edges():
-            new_graph.add_edge(current_node1, current_node2, graph.get_edge(current_node1, current_node2))
-        nodes_by_degree = dict( (degree,{}) for degree in graph.degree() )
-        graph_degree = graph.degree(with_labels=True)
+            new_graph.add_edge(current_node1, current_node2, graph.get_edge_data(current_node1, current_node2))
+        nodes_by_degree = dict( (degree,{}) for degree in graph.degree().values() )
+        graph_degree = graph.degree()
         [ nodes_by_degree[graph_degree[node]].setdefault(node) for node in graph_degree ]
         
         #if n_edge < MIN_NUMBER_OF_PERTURBATION:
@@ -610,8 +620,8 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 		if debug:
 		    print "rm %d %d" % (source_id, target_id)
 		    print "rm %d %d" % (new_source_id, new_target_id)
-                edge_data_1 = new_graph.get_edge(source_id, target_id)
-                edge_data_2 = new_graph.get_edge(new_source_id, new_target_id)
+                edge_data_1 = new_graph.get_edge_data(source_id, target_id)
+                edge_data_2 = new_graph.get_edge_data(new_source_id, new_target_id)
                 new_graph.delete_edge(source_id, target_id)
                 new_graph.delete_edge(new_source_id, new_target_id)
 		if debug:
@@ -643,7 +653,7 @@ def permute_graph_at_given_percentage(graph, percentage, allow_self_edges = True
 		    or (edge[0] == source_id and edge[1] == target_id) or (edge[1] == source_id and edge[0] == target_id):
 	    source_id = random.choice(nodes)
 	    target_id = random.choice(nodes)
-	new_graph.add_edge(source_id, target_id, graph.get_edge(edge[0],edge[1]))
+	new_graph.add_edge(source_id, target_id, graph.get_edge_data(edge[0],edge[1]))
     return new_graph 
  
 
@@ -698,7 +708,7 @@ def create_R_analyze_network_script(g, seeds = None, out_path = "./", title = ""
 
     f.write("f<-function(l) { \nr<-c()\nfor(i in 1:length(l)) {\n if(l[i] <= 1) {\n  r[i]<-l[i]\n }\n else { \n  r[i]<-(1+log10(l[i]))\n } \n}\nreturn(r)\n}\n")
     # Degree distribution
-    #degrees = g.degree(with_labels = True) 
+    #degrees = g.degree() 
     #n_node = len(degrees)
     #d_max = max(degrees.values())
     d_max = max(node_to_values.values(), key=lambda x: x[0])[0]
@@ -902,7 +912,7 @@ def create_ARFF_network_metrics_file(g, node_to_score, seeds, arff_file_name, ca
     f.close()
     return
 
-def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), ups = set(), downs = set(), draw_type = "all"):
+def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), ups = set(), downs = set(), weak_edges = set(), draw_type = "all"):
     """
     roots seeds
     remove seed-seed interactions
@@ -925,6 +935,7 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 			print node_to_desc[seed1], node_to_desc[node], node_to_desc[seed2]
     #print linkers
 
+    ignored = set()
     if draw_type == "linker annotated":
 	for node in g.nodes():
 	    if len(set(g.neighbors(node))&seeds) > 1:
@@ -958,7 +969,12 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 		f.write("%s [label=\"%s\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	    elif node in downs:
 		f.write("%s [label=\"%s\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
-	ignored = ((set(g.nodes()) - seeds) - ups) - downs 
+	ignored = ((set(g.nodes()) - seeds) - ups) - downs  
+    elif draw_type == "seeds_only":
+	for node in g.nodes():
+	    if node in seeds:
+		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+	ignored = set(g.nodes()) - seeds  
     elif draw_type == "all":
 	for node in g.nodes():
 	    if node in seeds:
@@ -972,11 +988,21 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 	ignored = set()
 
     for u,v in g.edges_iter():
-	if u in seeds and v in seeds:
-	    continue
 	if u in ignored or v in ignored:
 	    continue
-	f.write("%s -- %s [color=blue];\n" % (u, v))
+	if u == v: # skip self edges
+	    continue
+	# draw dashed lines for weak edges
+	if len(weak_edges) > 0:
+	    if (u, v) in weak_edges:
+		f.write("%s -- %s [color=darkgrey, style=dashed];\n" % (u, v))
+	    else:
+		f.write("%s -- %s [color=blue];\n" % (u, v))
+	else:
+	    # skip edges between seeds
+	    if u in seeds and v in seeds:
+		continue
+	    f.write("%s -- %s [color=blue];\n" % (u, v))
     f.write("}\n")
     f.close()
     #os.system("dot %s -Tgif > %s.gif" % (dot_fname, dot_fname))

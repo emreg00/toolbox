@@ -72,7 +72,7 @@ def get_id_to_mapped_id_mapping(node_mapping_file, delim="\t", inner_delim = ","
     return id_to_mapped_ids_formatted
 
 
-def create_id_mapping_file_from_gene_info(gene_info_file, gene_ids, output_file):
+def create_id_mapping_file_from_gene_info(gene_info_file, gene_ids, output_file, one_gene_per_node=True):
     reader = TsvReader.TsvReader(gene_info_file, delim="\t", inner_delim = ",")
     columns, id_to_mapped_ids = reader.read(fields_to_include = None, keys_to_include=gene_ids, merge_inner_values = True)
 
@@ -84,7 +84,10 @@ def create_id_mapping_file_from_gene_info(gene_info_file, gene_ids, output_file)
 	    vals.remove("-")
 	if len(vals) < 1:
 	    continue
-	f.write("%s\t%s\n" % (node, vals[0]))
+	if one_gene_per_node:
+	    f.write("%s\t%s\n" % (node, vals[0]))
+	else:
+	    [ f.write("%s\t%s\n" % (node, val)) for val in vals ]
     f.close()
     return
 
@@ -128,6 +131,30 @@ def output_mapped_node_id_scores(output_scores_file, node_mapping_file, one_gene
     else:
 	print "%s\t%f" % (gene, score)
     return 
+
+
+def convert_node_scores_to_edge_scores(network_file, node_file, output_file):
+    f = open(node_file)
+    geneid_to_score = {}
+    for line in f:
+	geneid, score = line.strip().split("\t")
+	geneid_to_score[geneid] = float(score)
+    f.close()
+    f = open(network_file)
+    interactions = []
+    for line in f:
+	geneid1, dummy, geneid2 = line.strip().split(" ")
+	score = (geneid_to_score[geneid1] + geneid_to_score[geneid2]) / 2
+	interactions.append((score, geneid1, geneid2))
+    f.close()
+    interactions.sort()
+    interactions.reverse()
+    f_out = open(output_file, 'w')
+    for score, geneid1, geneid2 in interactions:
+	f_out.write("%s\t%s\t%f\n" % (geneid1, geneid2, score))
+    f_out.close()
+    return
+
 
 
 if __name__ == "__main__":

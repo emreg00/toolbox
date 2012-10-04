@@ -70,6 +70,8 @@ def getOboGraph(fname, save_synonyms = False):
 		if stanza.type == "subset":
 		    if stanza.subset == "goslim_yeast":
 			obo.node[id]['y'] = True
+		    if stanza.subset.startswith("goslim"):
+			obo.node[id]['a'] = True
 		    continue
 		if save_synonyms and stanza.type == "synonym":
 		    obo.node[id].setdefault('s', set()).add(stanza.id)
