@@ -202,7 +202,7 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
     import numpy as np
     pvalues = np.array(pvalues)
     n = float(pvalues.shape[0])
-    new_pvalues = np.zeros(n)
+    new_pvalues = np.empty(n)
     if correction_type == "Bonferroni":
 	new_pvalues = n * pvalues
     elif correction_type == "Bonferroni-Holm":
@@ -214,37 +214,55 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
     elif correction_type == "Benjamini-Hochberg":
 	values = [ (pvalue, i) for i, pvalue in enumerate(pvalues) ]
 	values.sort()
-	for rank, vals in enumerate(values):
-	    pvalue, i = vals
-	    new_pvalues[i] = (n/(rank+1)) * pvalue
+	values.reverse()
+	new_values = []
+	for i, vals in enumerate(values):
+	    rank = n - i
+	    pvalue, index = vals
+	    new_values.append((n/rank) * pvalue)
+	for i in xrange(0, int(n)-1): 
+	    if new_values[i] < new_values[i+1]:
+		new_values[i+1] = new_values[i]
+	for i, vals in enumerate(values):
+	    pvalue, index = vals
+	    new_pvalues[index] = new_values[i]
+	#for rank, vals in enumerate(values):
+	    #pvalue, i = vals
+	    #new_pvalues[i] = (n/(rank+1)) * pvalue
     return new_pvalues
 
 def get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=None, seeds=None, random_seed=None):
     from random import randint, shuffle, seed
+    from numpy import array, empty
     node_to_significance = {}
     if with_replacement:
 	# 10000 times selects a node from network and checks how many of these cases 
 	# the selected node has a score greater or equal to node in concern
 	scores = background_to_score.values()
 	size = len(scores)-1
+	sample_size = 1000
+	selected = empty(sample_size)
 	for node, score in node_to_score.iteritems():
-	    n = 0
-	    for i in xrange(10000): 
-		selected = scores[randint(0,size)]
-		if selected >= score:
-		    n += 1
-	    node_to_significance[node] = n/10000.0
+	    #n = 0
+	    for i in xrange(sample_size): 
+		selected[i] = scores[randint(0,size)]
+		#selected = scores[randint(0,size)]
+		#if selected >= score:
+		#    n += 1
+	    n = (selected >= score).sum()
+	    #print node, score, n, n/float(sample_size)
+	    node_to_significance[node] = n/float(sample_size)
     else:
 	# Selects 1000 nodes and checks how many of them has a score 
 	# greater or equal to node in concern
-	from numpy import array
 	seed(random_seed) # if None current system time is used
+	sample_size = 1000
 	scores = [ score for node, score in node_to_score.iteritems() if node not in seeds ]
 	shuffle(scores)
-	selected = array(scores[:1000])
+	selected = array(scores[:sample_size])
 	for node, score in node_to_score.iteritems():
 	    n = (selected >= score).sum()
-	    node_to_significance[node] = n/1000.0
+	    node_to_significance[node] = n/float(sample_size)
     return node_to_significance
 
 def get_node_to_description(node_mapping_file, network_file):
@@ -271,6 +289,9 @@ def get_node_to_score(score_file):
     return node_to_score
 
 def get_top_nodes(score_file, selection_type="pvalue", background_score_file=None, seed_file=None, exclude_seeds=False):
+    """
+    selection_type: 2sigma | pvalue | pvalue-adj
+    """
     top_nodes = set() 
     node_to_score = get_node_to_score(score_file)
     if selection_type == "2sigma":
@@ -290,15 +311,20 @@ def get_top_nodes(score_file, selection_type="pvalue", background_score_file=Non
 	    val = (score - m) / s
 	    if val >= 2.0:
 		top_nodes.add(node)
-    elif selection_type == "pvalue":
+    elif selection_type.startswith("pvalue"):
 	background_to_score = get_node_to_score(background_score_file)
 	node_to_significance = get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=background_to_score)
 	pvalues = [ (val, node) for node, val in node_to_significance.iteritems() ]
-	new_pvalues = correct_pvalues_for_multiple_testing(zip(*pvalues)[0])
+	if selection_type=="pvalue-adj":
+	    new_pvalues = correct_pvalues_for_multiple_testing(zip(*pvalues)[0]) 
+	else:
+	    new_pvalues = zip(*pvalues)[0]
+	#print correct_pvalues_for_multiple_testing([0.0, 0.01, 0.029, 0.03, 0.031, 0.05, 0.069, 0.07, 0.071, 0.09, 0.1]) 
 	i = 0
 	for node, val in node_to_significance.iteritems():
+	    #print node, node_to_score[node], val, new_pvalues[i]
 	    if new_pvalues[i] <= 0.05:
-		top_nodes.add(node)
+	    	top_nodes.add(node)
 	    i += 1
     else:
 	raise ValueError("Invalid selection type!")
