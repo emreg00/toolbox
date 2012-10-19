@@ -1,5 +1,5 @@
 
-from toolbox import network_utilities, file_converter, stat_utilities
+from toolbox import network_utilities, file_converter, stat_utilities, selection_utilities
 import os
 
 def main():
@@ -41,8 +41,10 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
     print "Creating node score file"
     from random import shuffle
     node_file = scoring_folder +  "node_scores.sif" #seed_file.split("/")[-1] + ".converted"
+    seed_scores_file = scoring_folder +  "seed_scores.sif"
     seeds, dummy, seed_to_data, dummy = network_utilities.get_nodes_and_edges_from_sif_file(seed_file, store_edge_type = False, delim = delim, data_to_float=False)
     f = open(node_file, 'w')
+    f2 = open(seed_scores_file, 'w')
     node_to_data = {}
     for node in nodes:
 	if node in seeds:
@@ -50,18 +52,23 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
 		score = seed_to_data[node]
 	    else:
 		score = seed_score
+	    f2.write("%s%s%f\n" % (node, delim, score))
 	else:
 	    score = non_seed_score
 	node_to_data[node] = score
 	f.write("%s%s%f\n" % (node, delim, score))
     f.close()
+    f2.close()
     # Create background node file (selects k non-seeds randomly where k is the number of seeds)
     print "Creating background node score file"
     non_seeds = list(nodes - seeds)
     shuffle(non_seeds)
     random_seeds = set(non_seeds[:len(seeds)])
     bg_node_file = scoring_folder +  "node_scores_background.sif" #seed_file.split("/")[-1] + ".converted"
+    bg_seed_file = scoring_folder +  "seed_scores_background.sif" 
+    #random_seeds = set() 
     f = open(bg_node_file, 'w')
+    f2 = open(bg_seed_file, 'w')
     if seed_to_data is not None: seed_scores = seed_to_data.values()
     for node in nodes:
 	if node in random_seeds:
@@ -69,10 +76,12 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
 		score = seed_scores.pop()
 	    else:
 		score = seed_score
+	    f2.write("%s%s%f\n" % (node, delim, score))
 	else:
 	    score = non_seed_score
 	f.write("%s%s%f\n" % (node, delim, score))
     f.close()
+    f2.close()
     # Create modified edge file using node scores for netshort
     print "Creating node score converted edge file (for netshort)"
     nd_edge_file = scoring_folder + "edge_scores_netshort.sif" #network_file.split("/")[-1] + ".converted_for_netshort"
@@ -95,7 +104,7 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
 	    network_utilities.output_network_in_sif(g_sampled, sampling_prefix+"%s"%i)
     return
 
-def run_scoring(scoring_folder, executable_dir, scoring_type="netscore", parameters={"n_iteration":2, "n_repetition":3, "n_sample":100, "sampling_prefix":"./sampled_graph."}, qname=None):
+def run_scoring(scoring_folder, executable_dir, scoring_type="netscore", parameters={"n_iteration":2, "n_repetition":3, "n_sample":100, "sampling_prefix":"./sampled_graph.", "./nd_edge_file":"edge_scores_netshort.sif"}, qname=None):
     """
     scoring_type: netscore | netzcore | netshort | netcombo
     qname: sbi | sbi-short | bigmem
@@ -119,7 +128,9 @@ def run_scoring(scoring_folder, executable_dir, scoring_type="netscore", paramet
 
     edge_file = scoring_folder + "edge_scores.sif" 
     node_file = scoring_folder +  "node_scores.sif" 
+    seed_file = scoring_folder +  "seed_scores.sif" 
     bg_node_file = scoring_folder +  "node_scores_background.sif" 
+    bg_seed_file = scoring_folder +  "seed_scores_background.sif" 
     nd_edge_file = scoring_folder + "edge_scores_netshort.sif"
     sampling_prefix = scoring_folder + "sampled_graph."
     output_file = scoring_folder + "output_scores.sif"
@@ -129,6 +140,7 @@ def run_scoring(scoring_folder, executable_dir, scoring_type="netscore", paramet
 	return
     # Run scoring algorithm
     parameters["sampling_prefix"] = sampling_prefix
+
     if scoring_type == "netcombo":
 	scoring = "netscore"
 	parameters={"n_repetition":3, "n_iteration":2}
@@ -144,9 +156,11 @@ def run_scoring(scoring_folder, executable_dir, scoring_type="netscore", paramet
 	score(scoring, qname, bg_node_file, edge_file, bg_output_file, parameters)
 	score_combined([output_file+".netscore", output_file+".netzcore", output_file+".netshort"], output_file+".netcombo")
 	score_combined([bg_output_file+".netscore", bg_output_file+".netzcore", bg_output_file+".netshort"], bg_output_file+".netcombo")
+	output_pvalue_file(output_file+".netcombo", bg_output_file+"netcombo", seed_file, bg_seed_file)
     else:
 	score(scoring_type, qname, node_file, edge_file, output_file, parameters)
 	score(scoring_type, qname, bg_node_file, edge_file, bg_output_file, parameters)
+	output_pvalue_file(output_file, bg_output_file+scoring_type, seed_file, bg_seed_file)
     return
 
 def score_combined(scores_file_list, output_scores_file, combination_type="standard", reverse_ranking=False):
@@ -198,71 +212,89 @@ def score_combined(scores_file_list, output_scores_file, combination_type="stand
     f.close()
     return
 
-def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-Hochberg"):
-    import numpy as np
-    pvalues = np.array(pvalues)
-    n = float(pvalues.shape[0])
-    new_pvalues = np.empty(n)
-    if correction_type == "Bonferroni":
-	new_pvalues = n * pvalues
-    elif correction_type == "Bonferroni-Holm":
-	values = [ (pvalue, i) for i, pvalue in enumerate(pvalues) ]
-	values.sort()
-	for rank, vals in enumerate(values):
-	    pvalue, i = vals
-	    new_pvalues[i] = (n-rank) * pvalue
-    elif correction_type == "Benjamini-Hochberg":
-	values = [ (pvalue, i) for i, pvalue in enumerate(pvalues) ]
-	values.sort()
-	values.reverse()
-	new_values = []
-	for i, vals in enumerate(values):
-	    rank = n - i
-	    pvalue, index = vals
-	    new_values.append((n/rank) * pvalue)
-	for i in xrange(0, int(n)-1): 
-	    if new_values[i] < new_values[i+1]:
-		new_values[i+1] = new_values[i]
-	for i, vals in enumerate(values):
-	    pvalue, index = vals
-	    new_pvalues[index] = new_values[i]
-	#for rank, vals in enumerate(values):
-	    #pvalue, i = vals
-	    #new_pvalues[i] = (n/(rank+1)) * pvalue
-    return new_pvalues
+def output_pvalue_file(score_file, background_file, seed_file=None, background_seed_file=None, delim=" "):
+    node_to_score = get_node_to_score(score_file)
+    background_to_score = get_node_to_score(background_file)
+    seed_to_score = None
+    background_seed_to_score = None
+    if seed_file is not None:
+	seed_to_score = get_node_to_score(seed_file)
+    if background_seed_file is not None:
+	background_seed_to_score = get_node_to_score(background_seed_file)
+	for seed in background_seed_to_score:
+	    del background_to_score[seed]
+    node_to_significance = get_significance_among_node_scores(node_to_score, background_to_score)
+    pvalues = node_to_significance.values()
+    #new_pvalues = correct_pvalues_for_multiple_testing(pvalues) 
+    i = 0
+    f = open(score_file + ".pval", 'w')
+    f.write("Id%sScore%sP-value\n" % (delim, delim)) #Adjusted_P-value
+    for node, val in node_to_significance.iteritems():
+	if seed_to_score is not None and node in seed_to_score:
+	    f.write("%s%s%f%s%s\n" % (node, delim, node_to_score[node], delim, 0))
+	else:
+	    f.write("%s%s%f%s%s\n" % (node, delim, node_to_score[node], delim, str(val)))
+	i += 1
+    f.close()
+    return
 
-def get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=None, seeds=None, random_seed=None):
-    from random import randint, shuffle, seed
-    from numpy import array, empty
+def output_edge_pvalue_file(network_file, score_file, background_file, seed_file=None, background_seed_file=None, delim=" "):
+    g = network_utilities.create_network_from_sif_file(network_file)
+    node_to_score = get_node_to_score(score_file)
+    background_to_score = get_node_to_score(background_file)
+    seed_to_score = None
+    background_seed_to_score = None
+    #if seed_file is not None:
+    #	seed_to_score = get_node_to_score(seed_file)
+    if background_seed_file is not None:
+	background_seed_to_score = get_node_to_score(background_seed_file)
+    edge_to_score = {}
+    background_edge_to_score = {}
+    for u, v in g.edges():
+	edge_to_score[(u,v)] = (node_to_score[u] + node_to_score[v]) / 2
+	if u in background_seed_to_score or v in background_seed_to_score:
+	    continue
+	background_edge_to_score[(u,v)] = (background_to_score[u] + background_to_score[v]) / 2
+    node_to_significance = get_significance_among_node_scores(edge_to_score, background_edge_to_score)
+    pvalues = node_to_significance.values()
+    i = 0
+    f = open(score_file + ".edge_pval", 'w')
+    f.write("Id1%sId2%sScore%sP-value\n" % (delim, delim, delim)) 
+    for edge, val in node_to_significance.iteritems():
+	f.write("%s%s%s%s%f%s%s\n" % (edge[0], delim, edge[1], delim, edge_to_score[edge], delim, str(val)))
+	i += 1
+    f.close()
+    return
+
+def get_significance_among_node_scores(node_to_score, background_to_score, n_fold=10000, n_sample = 1000): 
+    """
+	n_sample: this number of times selects a node from network and checks how many of these cases 
+	the selected node has a score greater or equal to score cutoff (score bins)
+	n_fold: repeats the procedure this number of times to get p-values
+    """
+    from numpy import empty, array, arange, searchsorted, mean
     node_to_significance = {}
-    if with_replacement:
-	# 10000 times selects a node from network and checks how many of these cases 
-	# the selected node has a score greater or equal to node in concern
-	scores = background_to_score.values()
-	size = len(scores)-1
-	sample_size = 1000
-	selected = empty(sample_size)
-	for node, score in node_to_score.iteritems():
-	    #n = 0
-	    for i in xrange(sample_size): 
-		selected[i] = scores[randint(0,size)]
-		#selected = scores[randint(0,size)]
-		#if selected >= score:
-		#    n += 1
+    score_cutoffs = arange(0, 1.01, 0.01)
+    n_bin = len(score_cutoffs)
+    folds = empty((n_fold, n_bin))
+    values = background_to_score.values()
+    for i, selected in enumerate(selection_utilities.get_subsamples(values, n_fold, n_sample)):
+	selected = array(selected)
+	bins = empty(n_bin)
+	for j, score in enumerate(score_cutoffs):
 	    n = (selected >= score).sum()
-	    #print node, score, n, n/float(sample_size)
-	    node_to_significance[node] = n/float(sample_size)
-    else:
-	# Selects 1000 nodes and checks how many of them has a score 
-	# greater or equal to node in concern
-	seed(random_seed) # if None current system time is used
-	sample_size = 1000
-	scores = [ score for node, score in node_to_score.iteritems() if node not in seeds ]
-	shuffle(scores)
-	selected = array(scores[:sample_size])
-	for node, score in node_to_score.iteritems():
-	    n = (selected >= score).sum()
-	    node_to_significance[node] = n/float(sample_size)
+	    bins[j] = n/float(n_sample)
+	folds[i,:] = bins
+    # Average values
+    folds = mean(folds, axis=0)
+    #print "c(%s)" % ", ".join([ str(i) for i in folds])
+    for node, score in node_to_score.iteritems():
+	# Find the bin the score falls under
+	index = searchsorted(score_cutoffs, score)
+	if score_cutoffs[index] != score and score != 0:
+	    index -= 1
+	node_to_significance[node] = folds[index]
+	#print node, score, folds[index]
     return node_to_significance
 
 def get_node_to_description(node_mapping_file, network_file):
@@ -288,17 +320,23 @@ def get_node_to_score(score_file):
     nodes, dummy, node_to_score, dummy = network_utilities.get_nodes_and_edges_from_sif_file(file_name = score_file, store_edge_type = False)
     return node_to_score
 
-def get_top_nodes(score_file, selection_type="pvalue", background_score_file=None, seed_file=None, exclude_seeds=False):
+def get_top_nodes(pvalue_file, selection_type="pvalue", seed_file=None, cutoff=None, exclude_seeds=False):
     """
     selection_type: 2sigma | pvalue | pvalue-adj
+    cutoff: pvalue (e.g., 0.05) or sigma (e.g., 2) cutoff
     """
+    import TsvReader
     top_nodes = set() 
-    node_to_score = get_node_to_score(score_file)
+    reader = TsvReader.TsvReader(pvalue_file, delim=" ")
+    #["Id", "Score", "P-value", "Adjusted_P-value"]
+    columns, node_to_values = reader.read(fields_to_include = None)
     if selection_type == "2sigma":
+	if cutoff is None: cutoff = 2.0
 	from numpy import mean, std
 	seeds = get_nodes(seed_file)
 	values = []
-	for node, score in node_to_score.iteritems():
+	for node, values in node_to_values.iteritems():
+	    score, pval, adj_pval = values[0]
 	    if node not in seeds:
 		values.append((score, node))
 	    else: # include only seeds that are in the network
@@ -309,23 +347,26 @@ def get_top_nodes(score_file, selection_type="pvalue", background_score_file=Non
 
 	for score, node in values:
 	    val = (score - m) / s
-	    if val >= 2.0:
+	    if val >= cutoff:
 		top_nodes.add(node)
     elif selection_type.startswith("pvalue"):
-	background_to_score = get_node_to_score(background_score_file)
-	node_to_significance = get_significance_among_node_scores(node_to_score, with_replacement=True, background_to_score=background_to_score)
-	pvalues = [ (val, node) for node, val in node_to_significance.iteritems() ]
-	if selection_type=="pvalue-adj":
-	    new_pvalues = correct_pvalues_for_multiple_testing(zip(*pvalues)[0]) 
-	else:
-	    new_pvalues = zip(*pvalues)[0]
-	#print correct_pvalues_for_multiple_testing([0.0, 0.01, 0.029, 0.03, 0.031, 0.05, 0.069, 0.07, 0.071, 0.09, 0.1]) 
-	i = 0
-	for node, val in node_to_significance.iteritems():
-	    #print node, node_to_score[node], val, new_pvalues[i]
-	    if new_pvalues[i] <= 0.05:
+	if cutoff is None: cutoff = 0.05
+	#nodes = empty(len(node_to_values),dtype="a16") # uses numpy, faster
+        #pvalues = empty(len(node_to_values))
+	#i = 0
+	for node, values in node_to_values.iteritems():
+	    score, pval = values[0] #, adj_pval = values[0]
+	    #print node, score, pval, adj_pval
+	    val = float(pval)
+	    #if selection_type=="pvalue-adj":
+	    #	val = float(adj_pval)
+	    if val <= cutoff: 
 	    	top_nodes.add(node)
-	    i += 1
+	    #nodes[i] = node
+	    #pvalues[i] = val 
+	    #i += 1
+	#top_nodes = nodes[pvalues<=cutoff]
+
     else:
 	raise ValueError("Invalid selection type!")
     return top_nodes
