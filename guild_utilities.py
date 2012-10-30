@@ -212,6 +212,15 @@ def score_combined(scores_file_list, output_scores_file, combination_type="stand
     f.close()
     return
 
+def get_values_from_pvalue_file(pvalue_file, delim=" "):
+    f = open(pvalue_file)
+    line = f.readline() # skip header
+    node_to_values = {}
+    for line in f.readlines():
+	node, score, pval = line.strip().split(delim)
+	node_to_values[node] = (float(score), float(pval))
+    return node_to_values
+
 def output_pvalue_file(score_file, background_file, seed_file=None, background_seed_file=None, delim=" "):
     node_to_score = get_node_to_score(score_file)
     background_to_score = get_node_to_score(background_file)
@@ -224,12 +233,14 @@ def output_pvalue_file(score_file, background_file, seed_file=None, background_s
 	for seed in background_seed_to_score:
 	    del background_to_score[seed]
     node_to_significance = get_significance_among_node_scores(node_to_score, background_to_score)
-    pvalues = node_to_significance.values()
+    #pvalues = node_to_significance.values()
     #new_pvalues = correct_pvalues_for_multiple_testing(pvalues) 
+    values = [ (v, k) for k,v in node_to_significance.iteritems() ]
+    values.sort()
     i = 0
     f = open(score_file + ".pval", 'w')
     f.write("Id%sScore%sP-value\n" % (delim, delim)) #Adjusted_P-value
-    for node, val in node_to_significance.iteritems():
+    for val, node in values: #node_to_significance.iteritems():
 	if seed_to_score is not None and node in seed_to_score:
 	    f.write("%s%s%f%s%s\n" % (node, delim, node_to_score[node], delim, 0))
 	else:
@@ -256,11 +267,12 @@ def output_edge_pvalue_file(network_file, score_file, background_file, seed_file
 	    continue
 	background_edge_to_score[(u,v)] = (background_to_score[u] + background_to_score[v]) / 2
     node_to_significance = get_significance_among_node_scores(edge_to_score, background_edge_to_score)
-    pvalues = node_to_significance.values()
+    values = [ (v, k) for k,v in node_to_significance.iteritems() ]
+    values.sort()
     i = 0
     f = open(score_file + ".edge_pval", 'w')
     f.write("Id1%sId2%sScore%sP-value\n" % (delim, delim, delim)) 
-    for edge, val in node_to_significance.iteritems():
+    for val, edge in values:
 	f.write("%s%s%s%s%f%s%s\n" % (edge[0], delim, edge[1], delim, edge_to_score[edge], delim, str(val)))
 	i += 1
     f.close()
