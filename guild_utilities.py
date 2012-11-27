@@ -206,14 +206,14 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
 	score(scoring_type, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
 	    for i in range(1, xval+1):
-		score(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
+		score(scoring_type, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score(scoring_type, qname, bg_node_file, edge_file, bg_output_file, parameters)
-	    output_pvalue_file(output_file, bg_output_file+scoring_type, seed_file, bg_seed_file)
+	    output_pvalue_file(output_file+"."+scoring_type, bg_output_file+"."+scoring_type, seed_file, bg_seed_file)
 	    if xval is not None:
 		for i in range(1, xval+1):
-		    score(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
-		    output_pvalue_file(output_file+".%d" % i, bg_output_file+scoring_type, None, bg_seed_file)
+		    score(scoring_type, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
+		    output_pvalue_file(output_file+"."+scoring_type+".%d" % i, bg_output_file+"."+scoring_type, None, bg_seed_file)
     return
 
 def score_combined(scores_file_list, output_scores_file, combination_type="standard", reverse_ranking=False):
