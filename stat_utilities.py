@@ -15,6 +15,10 @@ def main():
         print "(%.2f - %.2f) / %.2f = %.2f" % ( sc, m, s, (sc - m) / s)
     return
 
+def convert_p_values_to_z_scores(pvalues):
+    a = np.random.normal(size=1000000) #1000000 # 10000000
+    return map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), pvalues)
+
 def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-Hochberg"):
     """
     consistent with R - print correct_pvalues_for_multiple_testing([0.0, 0.01, 0.029, 0.03, 0.031, 0.05, 0.069, 0.07, 0.071, 0.09, 0.1]) 

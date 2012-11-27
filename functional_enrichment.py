@@ -10,7 +10,7 @@ def main():
     return
 
 
-def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, specie = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False):
+def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False):
     """
 	Check GO functional enrichment using funcassociate web service
 	gene_ids is a list of gene symbols (without whitespace) or gene ids
@@ -32,7 +32,7 @@ def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_metho
     reps = 1500
     client_funcassociate = client.FuncassociateClient()
     response = client_funcassociate.functionate(query = subset_gene_ids,
-                             species = specie,
+                             species = species,
                              namespace = id_type,
                              genespace = gene_ids,
                              mode = mode,
