@@ -213,7 +213,7 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
 	    if xval is not None:
 		for i in range(1, xval+1):
 		    score(scoring_type, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
-		    output_pvalue_file(output_file+"."+scoring_type+".%d" % i, bg_output_file+"."+scoring_type, None, bg_seed_file)
+		    output_pvalue_file(output_file + ".%d" % i + "."+scoring_type, bg_output_file+"."+scoring_type, None, bg_seed_file)
     return
 
 def score_combined(scores_file_list, output_scores_file, combination_type="standard", reverse_ranking=False):
