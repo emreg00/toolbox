@@ -162,56 +162,56 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
 	parameters={"n_repetition":3, "n_iteration":2}
 	score(scoring, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
-	    for i in xval:
+	    for i in range(1, xval+1):
 		score(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score(scoring, qname, bg_node_file, edge_file, bg_output_file, parameters)
 	    if xval is not None:
-		for i in xval:
+		for i in range(1, xval+1):
 		    score(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 	scoring = "netzcore"
 	parameters={"n_iteration":5, "n_sample":100, "sampling_prefix":scoring_folder+"sampled_graph."}
 	score(scoring, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
-	    for i in xval:
+	    for i in range(1, xval+1):
 		score(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score(scoring, qname, bg_node_file, edge_file, bg_output_file, parameters)
 	    if xval is not None:
-		for i in xval:
+		for i in range(1, xval+1):
 		    score(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 	scoring = "netshort"
 	parameters={"nd_edge_file":nd_edge_file}
 	score(scoring, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
-	    for i in xval:
+	    for i in range(1, xval+1):
 		score(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score(scoring, qname, bg_node_file, edge_file, bg_output_file, parameters)
 	    if xval is not None:
-		for i in xval:
+		for i in range(1, xval+1):
 		    score(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 	score_combined([output_file+".netscore", output_file+".netzcore", output_file+".netshort"], output_file+".netcombo")
 	if xval is not None:
-	    for i in xval:
+	    for i in range(1, xval+1):
 		score_combined(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score_combined([bg_output_file+".netscore", bg_output_file+".netzcore", bg_output_file+".netshort"], bg_output_file+".netcombo")
 	    output_pvalue_file(output_file+".netcombo", bg_output_file+".netcombo", seed_file, bg_seed_file)
 	    if xval is not None:
-		for i in xval:
+		for i in range(1, xval+1):
 		    score_combined(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 		    output_pvalue_file(output_file+".netcombo"+".%d" % i, bg_output_file+".netcombo"+".%d" % i, None, bg_seed_file)
     else:
 	score(scoring_type, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
-	    for i in xval:
+	    for i in range(1, xval+1):
 		score(scoring, qname, node_file+".%d" % i, edge_file, output_file+".%d" % i, parameters)
 	if calculate_pvalue:
 	    score(scoring_type, qname, bg_node_file, edge_file, bg_output_file, parameters)
 	    output_pvalue_file(output_file, bg_output_file+scoring_type, seed_file, bg_seed_file)
 	    if xval is not None:
-		for i in xval:
+		for i in range(1, xval+1):
 		    score(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 		    output_pvalue_file(output_file+".%d" % i, bg_output_file+scoring_type, None, bg_seed_file)
     return
