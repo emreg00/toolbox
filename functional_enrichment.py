@@ -9,6 +9,11 @@ def main():
     check_functional_enrichment(a, None, "genesymbol", open(out_file_name, 'w').write, tex_format = False) 
     return
 
+def check_functional_enrichment_of_human_gene_symbols(file_name, out_file_name):
+    f=open(file_name)
+    a=map(lambda x: x.strip(), f.readlines())
+    check_functional_enrichment(a, None, "genesymbol", open(out_file_name, 'w').write, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format = False) 
+    return
 
 def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False):
     """
@@ -42,7 +47,7 @@ def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_metho
 	return response["over"]
 
     #headers = ["N", "M", "X", "LOD", "P", "P_adj", "attrib ID", "attrib name"]
-    headers = [ "# of high scoring genes", "# of total genes in high scoring subquery genes", "# of total genes", "Log of odds ratio", "P-value", "Adjusted p-value", "GO term ID", "Go term name" ]
+    headers = [ "# of genes", "# of genes in the query", "# of total genes", "Log of odds ratio", "P-value", "Adjusted p-value", "GO term ID", "Go term name" ]
 
     #if mode == "unordered":
     #	headers.pop(1)
@@ -85,6 +90,113 @@ def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_metho
 	for k in info.keys():
 	    output_method("%s: %s\n" % (k, info[k]))
     return response["over"]
+
+
+# Not recommended to be used when two sets of GO terms are going to be compared
+# In such cases redundancy can be removed using GoSemSim R package
+def remove_parent_terms(go_terms, g):
+    to_remove = set()
+    while True:
+	for go_term in go_terms:
+	    parent_terms = g.edges(go_term)
+	    #print set(zip(*parent_terms)[1])
+	    if len(parent_terms) != 0:
+		to_remove |= go_terms & set(zip(*parent_terms)[1])
+	    #print to_remove
+	if len(to_remove) == 0:
+	    break
+	#print len(go_terms & to_remove)
+	go_terms -= to_remove
+	to_remove = set()
+    return go_terms
+
+# For GoSemSim calculation in R
+def output_go_terms_and_levels(go_terms, go, output_file, root_id="GO:0008150"):
+    """
+	root_id = "GO:0008150" # BP
+    """
+    from networkx import bidirectional_shortest_path
+    f_out = open(output_file, 'w')
+    f_out.write("go level\n")
+    for go_id in go_terms:
+	level = len(bidirectional_shortest_path(go, go_id, root_id))
+	f_out.write("%s %d\n" % (go_id, level)) 
+    f_out.close()
+    return
+
+
+def get_go_ontology(file_name):
+    from toolbox import OboParser
+    go = OboParser.getOboGraph(file_name)
+    return go
+
+
+def get_functional_enrichment(enrichment_file, go, remove_parents=False, only_biological_processes=False, only_slim=False):
+    """
+	Read functional enrichment file.
+	If there are multiple functional enrichment analyses it takes the comment as the key and returns
+	a dictionary containing name - go_term pairs. If there is only one analysis, returns the go_terms.
+    """
+
+    #from toolbox import OboParser
+    #g=OboParser.getOboGraph("/home/emre/arastirma/celldiff/data/GO/gene_ontology.1_2.obo")
+    g=go
+
+    go_terms = None
+    name = None
+    name_to_go_terms ={}
+
+    f = open(enrichment_file)
+
+    for line in f:
+	line = line.strip()
+	if line.startswith("# of"):
+	    go_terms = set()
+	elif line.startswith("#"):
+	    if go_terms is not None: 
+		if name is None:
+		    name = "generic"
+		if remove_parents:
+		    go_terms = remove_parent_terms(go_terms, g)
+		name_to_go_terms[name] = go_terms
+		#print name, go_terms
+	    name = line 
+	else:
+	    words = line.split("\t")
+	    try:
+		n = int(words[0])
+		#pval = float(words[4]) # contains text like <0.0067
+	    except:
+		print words
+		continue
+	    go_term = words[5]
+	    if only_biological_processes:
+		if g.node[go_term]['t'] == "biological_process": # and 'a' in g.node[go_term]: #is bp and slim # ("molecular_function", "biological_process"):
+		    if only_slim:
+			if 'a' in g.node[go_term] and g.node[go_term]['a']:
+			    go_terms.add(go_term)
+		    else:
+			go_terms.add(go_term)
+	    else:
+		if only_slim:
+		    if 'a' in g.node[go_term] and g.node[go_term]['a']:
+			go_terms.add(go_term)
+		else:
+		    go_terms.add(go_term)
+
+    f.close()
+
+    if name is None:
+	name = "generic"
+    if remove_parents:
+	go_terms = remove_parent_terms(go_terms, g)
+    name_to_go_terms[name] = go_terms
+    #print name, go_terms
+
+    if "generic" in name_to_go_terms:
+	return name_to_go_terms["generic"]
+
+    return name_to_go_terms
 
 
 if __name__ == "__main__":

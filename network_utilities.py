@@ -144,17 +144,32 @@ def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, del
     return g
 
 
-def output_network_in_sif(g, output_file_name, delim = " ", include_unconnected=True):
+def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", include_unconnected=True, remove_self=True):
     f = open(output_file_name, 'w')
     included_nodes = set()
     for u,v in g.edges_iter():
-	f.write("%s%s%s%s%s\n" % (u, delim, g.get_edge_data(u,v)['w'], delim, v) )
-	included_nodes.add(u)
-	included_nodes.add(v)
+	try:
+	    weight = str(g.get_edge_data(u,v)['w'])
+	except:
+	    weight = "default"
+	if node_to_desc is not None:
+	    desc1, desc2 = node_to_desc[u], node_to_desc[v]
+	else:
+	    desc1, desc2 = u, v
+	if remove_self:
+	    if desc1 == desc2:
+		continue
+	f.write("%s%s%s%s%s\n" % (desc1, delim, weight, delim, desc2) )
+	included_nodes.add(desc1)
+	included_nodes.add(desc2)
     if include_unconnected:
 	for u in g.nodes_iter():
-	    if u not in included_nodes:
-		f.write("%s\n" % u )
+	    if node_to_desc is not None:
+		desc = node_to_desc[u]
+	    else:
+		desc = u
+	    if desc not in included_nodes:
+		f.write("%s\n" % desc)
     f.close()
     return
 
@@ -940,51 +955,53 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 	for node in g.nodes():
 	    if len(set(g.neighbors(node))&seeds) > 1:
 		if node in seeds:
-		    f.write("%s [label=\"\" fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		    f.write("%s [label=\"\" fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node)) 
 		else:
 		    f.write("%s [label=\"\" color=green height=0.05 width=0.05 shape=rect];\n" % (node)) 
 	    else:
 		if node in seeds:
-		    f.write("%s [label=\"\" fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		    f.write("%s [label=\"\" fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node)) 
 		else:
 		    f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
 	ignored = set()
     elif draw_type == "linker_only":
 	for node in g.nodes():
 	    if node in seeds:
-		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+		f.write("%s [label=\"%s\" style=filled fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	    elif node in linkers: 
 		if node in ups: 
 		    f.write("%s [label=\"\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
 		elif node in downs:
-		    f.write("%s [label=\"\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		    f.write("%s [label=\"\" style=filled fillcolor=blue color=blue fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
 		else:
 		    f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
 	ignored = ((set(g.nodes()) - seeds) - linkers) 
     elif draw_type == "regulated_only":
 	for node in g.nodes():
 	    if node in seeds:
-		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+		f.write("%s [label=\"%s\" style=filled fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	    elif node in ups: 
 		f.write("%s [label=\"%s\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	    elif node in downs:
-		f.write("%s [label=\"%s\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+		f.write("%s [label=\"%s\" style=filled fillcolor=blue color=blue fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	ignored = ((set(g.nodes()) - seeds) - ups) - downs  
     elif draw_type == "seeds_only":
 	for node in g.nodes():
 	    if node in seeds:
-		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+		f.write("%s [label=\"%s\" style=filled fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	ignored = set(g.nodes()) - seeds  
     elif draw_type == "all":
 	for node in g.nodes():
 	    if node in seeds:
-		f.write("%s [label=\"%s\" style=filled fillcolor=yellow root=true color=yellow height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
+		f.write("%s [label=\"%s\" style=filled fillcolor=red root=true color=red height=0.05 width=0.05 shape=rect];\n" % (node, node_to_desc[node])) 
 	    elif node in ups: 
 		f.write("%s [label=\"\" style=filled fillcolor=green color=green fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
 	    elif node in downs:
-		f.write("%s [label=\"\" style=filled fillcolor=red color=red fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		f.write("%s [label=\"\" style=filled fillcolor=blue color=blue fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+	    elif not any(map(lambda x: x!=node and x in node_to_desc, g.neighbors(node))):
+		continue # skip nodes with only self edge 
 	    else:
-		f.write("%s [label=\"\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node)) 
+		f.write("%s [label=\"%s\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, "")) # node_to_desc[node]
 	ignored = set()
 
     for u,v in g.edges_iter():
@@ -1000,8 +1017,8 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 		f.write("%s -- %s [color=blue];\n" % (u, v))
 	else:
 	    # skip edges between seeds
-	    if u in seeds and v in seeds:
-		continue
+	    #if u in seeds and v in seeds:
+	    #	continue
 	    f.write("%s -- %s [color=blue];\n" % (u, v))
     f.write("}\n")
     f.close()
