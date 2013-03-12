@@ -41,6 +41,27 @@ def k_fold_cross_validation(X, K, randomize = False, replicable = None):
 	yield k+1, training, validation
     return
 
+def generate_samples_from_list_without_replacement(elements, sample_size, n_folds = None, replicable = None):
+    """
+	Iteratively returns (yields) n_folds sublists of elements with a size of sample_size 
+	n_folds: If None calculated to cover as much elements as possible
+	replicable: If not None uses this replicable as the seed for random
+    """
+    from random import shuffle, seed
+    if replicable is not None:
+	seed(replicable)
+    shuffle(elements)
+    if n_folds is None:
+	from math import ceil
+	#n_folds = len(elements) / sample_size
+	n_folds = int(ceil(float(len(elements)) / sample_size))
+    for i in range(n_folds):
+	if (i+1)*sample_size < len(elements):
+	    yield elements[i*sample_size:(i+1)*sample_size]
+	else:
+	    yield elements[i*sample_size:]
+    return
+
 
 if __name__ == "__main__":
     main()

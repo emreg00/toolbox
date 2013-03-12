@@ -19,7 +19,7 @@ class GO(OBO):
 	return self.go_id_to_genes
 	
     def _get_classification(self, go_goa_file, exclude_evidences):
-	from goGOAParser import GOGOAParser
+	from GOGOAParser import GOGOAParser
 	parser = GOGOAParser(go_goa_file)
 	self.go_id_to_genes = parser.parse(exclude_evidences)
 	return 
