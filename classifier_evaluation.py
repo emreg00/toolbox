@@ -1,6 +1,6 @@
 from toolbox import guild_utilities, selection_utilities
 
-def create_R_script(file_name, absolute_dir, title=None, only=None, show_spread=False, append=False):
+def create_R_script(file_name, absolute_dir, title=None, only=None, show_spread=False, vertical_average=False, append=False):
     if title is not None:
 	plot_title = title
     if append:
@@ -32,16 +32,22 @@ def create_R_script(file_name, absolute_dir, title=None, only=None, show_spread=
 	    plot_title = "Precision vs Sensitivity"
 	f.write("perfPPV<-performance(pred, \"ppv\")\n")
 	f.write("perfSens<-performance(pred, \"sens\")\n")
-	if show_spread:
-	    f.write("d<-average(perfPPV@x.values)\n")
-	    f.write("plot(perfPPV, lwd=2, col=2, ylab=\"Percentage\", main=\"%s\", avg=\"vertical\", plotCI.col=2, spread.estimate=\"stddev\", show.spread.at=seq(0,d,by=d/6))\n" % plot_title)
+	if vertical_average:
+	    if show_spread:
+		f.write("d<-average(perfPPV@x.values)\n")
+		f.write("plot(perfPPV, lwd=2, col=2, ylab=\"Percentage\", main=\"%s\", avg=\"vertical\", plotCI.col=2, spread.estimate=\"stddev\", show.spread.at=seq(0,d,by=d/6))\n" % plot_title)
+	    else:
+		f.write("plot(perfPPV, lwd=2, col=2, ylab=\"Percentage\", main=\"%s\", avg=\"vertical\")\n" % plot_title)
 	else:
-	    f.write("plot(perfPPV, lwd=2, col=2, ylab=\"Percentage\", main=\"%s\", avg=\"vertical\")\n" % plot_title)
-	if show_spread:
-	    f.write("d<-average(perfSens@x.values)\n")
-	    f.write("plot(perfSens, lwd=2, col=3, avg=\"vertical\", plotCI.col=3, spread.estimate=\"stddev\", show.spread.at=seq(0,d,by=d/6), add=TRUE)\n") 
+	    f.write("plot(perfPPV, lwd=2, col=2, ylab=\"Percentage\", main=\"%s\", xlim=c(0,0.4), ylim=c(0,1))\n" % plot_title)
+	if vertical_average:
+	    if show_spread:
+		f.write("d<-average(perfSens@x.values)\n")
+		f.write("plot(perfSens, lwd=2, col=3, avg=\"vertical\", plotCI.col=3, spread.estimate=\"stddev\", show.spread.at=seq(0,d,by=d/6), add=TRUE)\n") 
+	    else:
+		f.write("plot(perfSens, lwd=2, col=3, avg=\"vertical\", add=TRUE)\n") 
 	else:
-	    f.write("plot(perfSens, lwd=2, col=3, avg=\"vertical\", add=TRUE)\n") 
+	    f.write("plot(perfSens, lwd=2, col=3, add=TRUE)\n") 
 	f.write("perf<-performance(pred, \"prbe\")\n")
 	f.write("legend(\"bottomright\", c(\"Precision\", \"Sensitivity\", paste(\"(\", format(average(perf@x.values), digits=2), format(average(perf@y.values), digits=2), \")\", sep=\" \")), lty=c(1,1,0), col=c(2,3,1))\n")
 	f.close()
