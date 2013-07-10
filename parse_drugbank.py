@@ -9,6 +9,8 @@ import re, math
 
 def main():
     drugbank_file = "../data/drugbank.xml" # test.xml
+    get_drugs_for_targets(drugbank_file, "drugs.txt")
+    return
     drugs_file = None #"drugs.txt"
     scores_file = "node_scores.sif.genesymbol"
     output_file = "drug_scores.txt"
@@ -23,10 +25,12 @@ class DrugBankXMLParser(object):
 
     def __init__(self, filename):
 	self.file_name = filename
+	self.drug_to_name = {}
 	self.drug_to_description = {}
 	self.drug_to_indication = {}
 	self.drug_to_partner_ids = {}
 	self.partner_id_to_gene = {}
+	self.partner_id_to_uniprot = {}
 	return
 
     def parse(self, selected_names=None, exp=None):
@@ -38,33 +42,70 @@ class DrugBankXMLParser(object):
 	event, root = context.next()
 	state_stack = [ root.tag ]
 	drug = None
+	drug_id = None
 	partner_id = None
+	resource = None
 	for (event, elem) in context:
 	    if event == "start":
 		state_stack.append(elem.tag)
 		if elem.tag == self.NS+"partner":
 		    if state_stack[-2] == self.NS+"partners":
 			partner_id = elem.attrib["id"]
+		if elem.tag == self.NS+"resource":
+		    uniprot_resource = False
 	    if event == "end":
 		if elem.tag == self.NS+"name":
 		    if state_stack[-2] == self.NS+"drug":
-			drug = elem.text
+			self.drug_to_name[drug_id] = elem.text
+		if elem.tag == self.NS+"drugbank-id":
+		    if state_stack[-2] == self.NS+"drug":
+			drug_id = elem.text
 		elif elem.tag == self.NS+"description":
 		    if state_stack[-2] == self.NS+"drug":
-			self.drug_to_description[drug] = elem.text
+			self.drug_to_description[drug_id] = elem.text
 		elif elem.tag == self.NS+"indication":
 		    if state_stack[-2] == self.NS+"drug":
-			self.drug_to_indication[drug] = elem.text
+			self.drug_to_indication[drug_id] = elem.text
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
-			self.drug_to_partner_ids.setdefault(drug, []).append(elem.attrib["partner"])
+			self.drug_to_partner_ids.setdefault(drug_id, []).append(elem.attrib["partner"])
 		elif elem.tag == self.NS+"gene-name":
 		    if state_stack[-3] == self.NS+"partners" and state_stack[-2] == self.NS+"partner":
 			self.partner_id_to_gene[partner_id] = elem.text
+		elif elem.tag == self.NS+"resource":
+		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
+			if state_stack[-5] == self.NS+"partners" and state_stack[-4] == self.NS+"partner":
+			    resource = elem.text 
+		elif elem.tag == self.NS+"identifier":
+		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
+			if state_stack[-5] == self.NS+"partners" and state_stack[-4] == self.NS+"partner":
+			    if resource == "UniProtKB":
+				self.partner_id_to_uniprot[partner_id] = elem.text
 		elem.clear()
 		state_stack.pop()
 	root.clear()
 	return 
+
+def get_drugs_for_targets(file_name, output_file):
+    parser = DrugBankXMLParser(file_name)
+    parser.parse()
+    uniprot_to_drugs = {}
+    for drug, partner_ids in parser.drug_to_partner_ids.iteritems():
+	#print drug
+	for partner_id in partner_ids:
+	    try:
+		uniprot = parser.partner_id_to_uniprot[partner_id]
+	    except:
+		# drug target has no uniprot
+		uniprot = None
+	    if uniprot is None:
+		continue
+	    uniprot_to_drugs.setdefault(uniprot, set()).add(drug)
+    f = open(output_file, 'w')
+    for uniprot, drugs in uniprot_to_drugs.iteritems():
+	f.write("%s\t%s\n" % (uniprot, ";".join(drugs)))
+    f.close()
+    return
 
 def get_drug_targets(file_name, drugs_file=None):
     parser = DrugBankXMLParser(file_name)

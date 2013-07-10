@@ -454,7 +454,7 @@ def get_node_to_score(score_file):
     nodes, dummy, node_to_score, dummy = network_utilities.get_nodes_and_edges_from_sif_file(file_name = score_file, store_edge_type = False)
     return node_to_score
 
-def get_top_nodes(pvalue_file, selection_type="pvalue", seed_file=None, cutoff=None, exclude_seeds=False):
+def get_top_nodes(pvalue_file, selection_type="pvalue", seed_file=None, cutoff=None, exclude_seeds=False, delim=" "):
     """
 	Selects top scoring nodes using GUILD p-value file.
 
@@ -466,18 +466,23 @@ def get_top_nodes(pvalue_file, selection_type="pvalue", seed_file=None, cutoff=N
     """
     import TsvReader
     top_nodes = set() 
-    reader = TsvReader.TsvReader(pvalue_file, delim=" ")
+    reader = TsvReader.TsvReader(pvalue_file, delim=delim)
     #["Id", "Score", "P-value", "Adjusted_P-value"]
     columns, node_to_values = reader.read(fields_to_include = None)
-    if selection_type == "2sigma":
+    if selection_type == "sigma":
 	if cutoff is None: cutoff = 2.0
 	from numpy import mean, std
 	seeds = get_nodes(seed_file)
 	values = []
-	for node, values in node_to_values.iteritems():
-	    score, pval, adj_pval = values[0]
+	for node, vals in node_to_values.iteritems():
+	    try:
+		# p-val file
+		score, pval, adj_pval = vals[0]
+	    except:
+		# output scores file
+		score = vals[0][0]
 	    if node not in seeds:
-		values.append((score, node))
+		values.append((float(score), node))
 	    else: # include only seeds that are in the network
 		if exclude_seeds == False:
 		    top_nodes.add(node)
