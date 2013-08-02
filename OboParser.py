@@ -24,6 +24,10 @@ class Relationship:
 	elif tag_line.startswith("subset"):
 	    self.type = "subset"
 	    self.subset = tag_line.split(' ')[1]
+        elif tag_line.startswith('alt_id'):
+            parts = tag_line.split(' ')
+	    self.type = parts[0].rstrip(':')
+            self.id = parts[1]
 	else:
 	    self.type = "ignore"
         
@@ -51,12 +55,10 @@ def getOboGraph(fname, save_synonyms = False):
             # Legible Name
             obo.node[id]['n'] = name
             obo.node[id]['t'] = namespace
-            # Number of Arrays
-            obo.node[id]['w'] = 0
-            # Diff Express Genes
-            obo.node[id]['g'] = {}
-	    # Synonyms 
-	    #obo.node[id]['s'] = set()
+            # Alternative ids 
+            obo.node[id]['x'] = []
+            # Genes
+            obo.node[id]['g'] = []
             
             while True:
                 stanza = obo_file.next().strip()
@@ -64,7 +66,6 @@ def getOboGraph(fname, save_synonyms = False):
                     break
                 
                 stanza = Relationship(stanza, save_synonyms)
-		#try:                
 		if stanza.type == "ignore":
 		    continue
 		if stanza.type == "subset":
@@ -73,15 +74,17 @@ def getOboGraph(fname, save_synonyms = False):
 		    if stanza.subset.startswith("goslim"):
 			obo.node[id]['a'] = True
 		    continue
+		# Synonyms 
 		if save_synonyms and stanza.type == "synonym":
 		    obo.node[id].setdefault('s', set()).add(stanza.id)
 		    #obo.node[id]['s'].add(stanza.id)
 		    continue
+		if stanza.type == "alt_id":
+		    obo.node[id]['x'].append(stanza.id)
+		    continue
+		#if stanza.type in ("is_a", "relationship"): 
 		obo.add_edge(id, stanza.id)
 		obo[id][stanza.id]['r'] = stanza.type
-		#except:
-		#    pass
     
     return obo
-
 

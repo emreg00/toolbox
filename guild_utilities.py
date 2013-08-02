@@ -68,6 +68,10 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
     node_score_file = scoring_folder + name + "node_scores.sif" #seed_file.split("/")[-1] + ".converted"
     seed_score_file = scoring_folder + name + "seed_scores.sif"
     seeds, dummy, seed_to_data, dummy = network_utilities.get_nodes_and_edges_from_sif_file(seed_file, store_edge_type = False, delim = delim, data_to_float=True)
+    if seed_to_data is None:
+	seed_to_data = {}
+	for seed in seeds: 
+	    seed_to_data[seed] = seed_score
     node_to_data = create_node_score_file(node_score_file, seed_score_file, nodes, seeds, seed_to_data, non_seed_score, seed_score, delim)
 
     # Create background node file (selects k non-seeds randomly where k is the number of seeds)

@@ -27,8 +27,11 @@ class DrugBankXMLParser(object):
 	self.file_name = filename
 	self.drug_to_name = {}
 	self.drug_to_description = {}
+	self.drug_to_groups = {}
 	self.drug_to_indication = {}
 	self.drug_to_partner_ids = {}
+	self.drug_to_pubchem = {}
+	self.drug_to_targets = {}
 	self.partner_id_to_gene = {}
 	self.partner_id_to_uniprot = {}
 	return
@@ -69,41 +72,81 @@ class DrugBankXMLParser(object):
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
 			self.drug_to_partner_ids.setdefault(drug_id, []).append(elem.attrib["partner"])
+		elif elem.tag == self.NS+"group":
+		    if state_stack[-2] == self.NS+"groups":
+			self.drug_to_groups.setdefault(drug_id, set()).add(elem.text)
 		elif elem.tag == self.NS+"gene-name":
 		    if state_stack[-3] == self.NS+"partners" and state_stack[-2] == self.NS+"partner":
 			self.partner_id_to_gene[partner_id] = elem.text
 		elif elem.tag == self.NS+"resource":
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
-			if state_stack[-5] == self.NS+"partners" and state_stack[-4] == self.NS+"partner":
-			    resource = elem.text 
+			resource = elem.text 
 		elif elem.tag == self.NS+"identifier":
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
 			if state_stack[-5] == self.NS+"partners" and state_stack[-4] == self.NS+"partner":
 			    if resource == "UniProtKB":
 				self.partner_id_to_uniprot[partner_id] = elem.text
+			elif state_stack[-4] == self.NS+"drug":
+			    if resource == "PubChem Compound":
+				self.drug_to_pubchem[drug_id] = elem.text
 		elem.clear()
 		state_stack.pop()
 	root.clear()
+        # Map target ids to uniprot ids
+        for drug, partner_ids in self.drug_to_partner_ids.iteritems():
+            for partner_id in partner_ids:
+                try:
+                    uniprot = self.partner_id_to_uniprot[partner_id]
+                except:
+                    # drug target has no uniprot
+                    continue
+                self.drug_to_targets.setdefault(drug, set()).add(uniprot)
 	return 
 
 def get_drugs_for_targets(file_name, output_file):
     parser = DrugBankXMLParser(file_name)
     parser.parse()
     uniprot_to_drugs = {}
-    for drug, partner_ids in parser.drug_to_partner_ids.iteritems():
+    for drug, targets in parser.drug_to_targets.iteritems():
 	#print drug
-	for partner_id in partner_ids:
-	    try:
-		uniprot = parser.partner_id_to_uniprot[partner_id]
-	    except:
-		# drug target has no uniprot
-		uniprot = None
-	    if uniprot is None:
-		continue
+	for uniprot in targets:
 	    uniprot_to_drugs.setdefault(uniprot, set()).add(drug)
     f = open(output_file, 'w')
     for uniprot, drugs in uniprot_to_drugs.iteritems():
 	f.write("%s\t%s\n" % (uniprot, ";".join(drugs)))
+    f.close()
+    return
+
+def get_drug_info(file_name, output_file):
+    parser = DrugBankXMLParser(file_name)
+    parser.parse()
+    f = open(output_file, 'w')
+    f.write("drugbank id\tname\tgroups\tpubchem id\tindication\ttargets\n")
+    for drug, name in parser.drug_to_name.iteritems():
+        name = name.encode('ascii','replace')
+        try:
+            groups = parser.drug_to_groups[drug]
+        except:
+            groups = []
+        try:
+            indication = parser.drug_to_indication[drug]
+            indication = indication.encode('ascii','replace')
+        except:
+            #print drug
+            indication = ""
+	if drug in parser.drug_to_pubchem:
+            pubchem = parser.drug_to_pubchem[drug]
+        else:
+	    pubchem = "" 
+        if drug in parser.drug_to_targets:
+            targets = parser.drug_to_targets[drug]
+        else:
+            targets = []
+        try:
+            f.write("%s\t%s\t%s\t%s\t%s\t%s\n" % (drug, name, ";".join(groups), pubchem, indication, ";".join(targets)))
+        except:
+            print drug, name, groups, pubchem, indication, targets
+            return
     f.close()
     return
 

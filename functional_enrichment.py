@@ -131,7 +131,7 @@ def get_go_ontology(file_name):
     return go
 
 
-def get_functional_enrichment(enrichment_file, go, remove_parents=False, only_biological_processes=False, only_slim=False):
+def get_functional_enrichment(enrichment_file, go, remove_parents=False, only_biological_processes=False, only_slim=False, logodds_cutoff=0):
     """
 	Read functional enrichment file.
 	If there are multiple functional enrichment analyses it takes the comment as the key and returns
@@ -146,8 +146,12 @@ def get_functional_enrichment(enrichment_file, go, remove_parents=False, only_bi
     name = None
     name_to_go_terms ={}
 
-    f = open(enrichment_file)
+    altid_to_goid = {}
+    for goid, data in g.nodes(data=True):
+	for altid in data["x"]:
+	    altid_to_goid[altid] = goid
 
+    f = open(enrichment_file)
     for line in f:
 	line = line.strip()
 	if line.startswith("# of"):
@@ -170,6 +174,11 @@ def get_functional_enrichment(enrichment_file, go, remove_parents=False, only_bi
 		print words
 		continue
 	    go_term = words[5]
+	    lodds = float(words[2])
+	    if lodds < logodds_cutoff:
+		continue
+	    if go_term in altid_to_goid:
+		go_term = altid_to_goid[go_term]
 	    if only_biological_processes:
 		if g.node[go_term]['t'] == "biological_process": # and 'a' in g.node[go_term]: #is bp and slim # ("molecular_function", "biological_process"):
 		    if only_slim:

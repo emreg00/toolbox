@@ -25,7 +25,7 @@ class GOGOAParser(object):
 	self.file_name = filename
 	return
 
-    def parse(self, exclude_evidences=None):
+    def parse(self, exclude_evidences=None, id_type="genesymbol"):
 	"""
 	# EXP: Inferred from Experiment
 	# IDA: Inferred from Direct Assay
@@ -33,6 +33,7 @@ class GOGOAParser(object):
 	# IMP: Inferred from Mutant Phenotype
 	# IGI: Inferred from Genetic Interaction
 	# IEP: Inferred from Expression Pattern 
+	id_type: genesymbol | uniprot
 	"""
 	go_id_to_genes = {}
 	if self.file_name.endswith(".gz") or self.file_name.endswith(".gz?rev=HEAD"):
@@ -65,8 +66,16 @@ class GOGOAParser(object):
 
 	    tax_ids = [ int(taxon.lstrip("taxon:")) for taxon in taxon_id.split('|') ]
 
-	    for tax_id in tax_ids:
+	    if id_type == "uniprot":
+		if db_name == "UniprotAccession":
+		    for tax_id in tax_ids:
+			go_id_to_genes.setdefault(go_id, set()).add((db_id, tax_id))
+		else:
+		    raise ValueError("Uknown db_name %s" % db_name) 
+	    elif id_type == "genesymbol":
 		go_id_to_genes.setdefault(go_id, set()).add((gene_name, tax_id))
+	    else:
+		raise ValueError("Unknown id_type %s" % id_type)
 	    
 	fd.close()
 

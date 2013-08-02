@@ -3,12 +3,11 @@ from OBO import OBO
 
 class GO(OBO):
 
-    def __init__(self, file_name, save_synonyms = False, go_goa_file = None, 
-	     exclude_evidences=None):
+    def __init__(self, file_name, save_synonyms = False, go_goa_file = None, exclude_evidences=None, id_type="genesymbol"):
 	OBO.__init__(self, file_name, save_synonyms)
 	self.go_id_to_genes = None
 	if go_goa_file is not None:
-	    self._get_classification(go_goa_file, exclude_evidences)
+	    self._get_classification(go_goa_file, exclude_evidences, id_type)
 	self.tf_genes = None
 	self.tf_related_genes = None
 	return
@@ -18,10 +17,10 @@ class GO(OBO):
 	    raise ValueError("GOA file not provided during initialization")
 	return self.go_id_to_genes
 	
-    def _get_classification(self, go_goa_file, exclude_evidences):
+    def _get_classification(self, go_goa_file, exclude_evidences, id_type):
 	from GOGOAParser import GOGOAParser
 	parser = GOGOAParser(go_goa_file)
-	self.go_id_to_genes = parser.parse(exclude_evidences)
+	self.go_id_to_genes = parser.parse(exclude_evidences, id_type)
 	return 
 
     def get_tf_genes(self):

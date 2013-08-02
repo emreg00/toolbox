@@ -51,7 +51,7 @@ class TsvReader(FormattedFileProcessor):
 	if merge_inner_values:
 	    if self.inner_delim is None:
 		raise Exception("merge_inner_values requires that inner_delim is defined!")
-	#print "Start:", columns
+	#print "Start:", columns 
 	id_to_values = {}
 	line_prev = line
 	line = file.readline()
@@ -61,7 +61,7 @@ class TsvReader(FormattedFileProcessor):
 	    keys_to_include = set(keys_to_include)
 	while line:
 	    try:
-		vals = line.strip().split(self.delim)
+		vals = line.rstrip().split(self.delim)
 		id = vals[columns[first_column]]
 		if keys_to_include is None or id in keys_to_include:
 		    new_vals = []
