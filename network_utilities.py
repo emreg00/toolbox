@@ -68,11 +68,54 @@ def get_shortest_path_between(G, source_id, target_id):
     return networkx.shortest_path(G, source_id, target_id)
 
 
+def get_all_shortest_paths_between(G, source_id, target_id):
+    return networkx.all_shortest_paths(G, source_id, target_id)
+
+
 def get_all_paths_from(G, source_id): 
     """
         get all paths from source node to all possible nodes in a dictionary
     """
     return networkx.single_source_dijkstra_path(G, source_id)
+
+
+def get_edge_betweenness_within_subset(G, subset, source, target):
+    """
+	Calculate edge (relative) betweenness within the paths of a given subset of nodes
+	source, target represents the edge for which betweenness is calculated
+	In case there are multiple shortest paths, the edge is counted if it is in any of them
+	Assumes connected component (there is a bath between any two nodes)
+    """
+    count = 0
+    total = 0
+    for i, u in enumerate(subset):
+	for j, v in enumerate(subset):
+	    if j>=i:
+		continue
+	    paths = networkx.all_shortest_paths(G, u, v)
+	    for path in paths:
+		subgraph = create_graph()
+		subgraph.add_path(path)
+		if subgraph.has_edge(source, target)
+		    count += 1
+		    break
+	    total += 1
+    return float(count)/total
+
+
+def get_pairwise_distances_between_nodes(g, sources, targets=None):
+    symetric = False
+    if targets is None:
+	targets = sources
+	symetric = True
+    values = []
+    for i, u in enumerate(sources):
+	sp_lengths = networkx.single_source_dijkstra_path_length(g, u)
+	for j, v in enumerate(targets):
+	    if symetric and j>=i:
+		continue
+	    values.append(sp_lengths[v])
+    return values
 
 
 def get_path_network(G, listNodes, path_length_cutoff=10000):
@@ -132,7 +175,7 @@ def get_connected_components(G, return_as_graph_list=True):
 
 def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, delim = None, include_unconnected=True):
     setNode, setEdge, dictDummy, dictEdge = get_nodes_and_edges_from_sif_file(network_file_in_sif, store_edge_type = use_edge_data, delim = delim)
-    g=networkx.Graph()
+    g = create_graph()
     if include_unconnected:
 	g.add_nodes_from(setNode)
     if use_edge_data:
@@ -143,6 +186,12 @@ def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, del
 	g.add_edges_from(setEdge)
     return g
 
+def create_network_from_two_column_file(network_file_in_two_column, delim = None):
+    g = create_graph()
+    for line in open(network_file_in_two_column):
+	id1, id2 = line.strip().split("\t")
+	network.add_edge(id1, id2)
+    return g
 
 def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", include_unconnected=True, remove_self=True):
     f = open(output_file_name, 'w')
@@ -172,7 +221,6 @@ def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", i
 		f.write("%s\n" % desc)
     f.close()
     return
-
 
 def analyze_network(g, out_file = None, seeds = None, calculate_radius = False):
     if out_file is None:
