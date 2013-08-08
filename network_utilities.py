@@ -79,28 +79,32 @@ def get_all_paths_from(G, source_id):
     return networkx.single_source_dijkstra_path(G, source_id)
 
 
-def get_edge_betweenness_within_subset(G, subset, source, target):
+def get_edge_betweenness_within_subset(G, subset, edges):
     """
 	Calculate edge (relative) betweenness within the paths of a given subset of nodes
-	source, target represents the edge for which betweenness is calculated
-	In case there are multiple shortest paths, the edge is counted if it is in any of them
+	edges is a list of (source, target) pairs for which betweenness is calculated
 	Assumes connected component (there is a bath between any two nodes)
+	##In case there are multiple shortest paths, the edge is counted if it is in any of them
     """
-    count = 0
-    total = 0
+    edge_to_values = {}
     for i, u in enumerate(subset):
+	#print i, u, len(subset)
 	for j, v in enumerate(subset):
 	    if j>=i:
 		continue
-	    paths = networkx.all_shortest_paths(G, u, v)
-	    for path in paths:
-		subgraph = create_graph()
-		subgraph.add_path(path)
-		if subgraph.has_edge(source, target)
-		    count += 1
-		    break
-	    total += 1
-    return float(count)/total
+	    paths_gen = networkx.all_shortest_paths(G, u, v)
+	    paths = [ [ p for p in path_gen ] for path_gen in paths_gen ]
+	    for s, t in edges:
+		count = 0
+		total = 0
+		for path in paths:
+		    #path = [ p for p in path_gen ]
+		    for k in range(1, len(path)):
+			if (path[k-1], path[k]) == (s, t) or (path[k-1], path[k]) == (t, s):
+			    count += 1
+		    total += 1
+		edge_to_values.setdefault((s,t), []).append(float(count)/total)
+    return edge_to_values 
 
 
 def get_pairwise_distances_between_nodes(g, sources, targets=None):
@@ -190,7 +194,7 @@ def create_network_from_two_column_file(network_file_in_two_column, delim = None
     g = create_graph()
     for line in open(network_file_in_two_column):
 	id1, id2 = line.strip().split("\t")
-	network.add_edge(id1, id2)
+	g.add_edge(id1, id2)
     return g
 
 def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", include_unconnected=True, remove_self=True):
