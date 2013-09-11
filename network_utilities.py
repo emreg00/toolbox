@@ -28,9 +28,8 @@
 #
 #########################################################################
 
-import networkx
-import random
-import copy
+import networkx, random, copy
+import os, cPickle
 
 #MIN_NUMBER_OF_PERTURBATION = 25
 MAX_NUMBER_OF_TRIAL = 6
@@ -42,12 +41,8 @@ def main():
     for v in g.nodes():
 	print v, degrees[v], node_to_values[v]
     create_R_analyze_network_script(g, seeds = ["v2","v3"], out_path="./")
-    g2=prepare_data.network_utilities.prune_graph_at_given_percentage(g,10)
+    g2=prune_graph_at_given_percentage(g,10)
     return
-
-def create_graph_with_same_type(G):
-    return create_empty_copy(G)
-
 
 def create_graph():
     """
@@ -55,6 +50,8 @@ def create_graph():
     """
     return networkx.Graph()
 
+def create_graph_with_same_type(G):
+    return create_empty_copy(G)
 
 def get_number_of_distinct_edges(G):
     edge_list = G.edges()
@@ -63,14 +60,71 @@ def get_number_of_distinct_edges(G):
         edge_set.add((id1, id2))
     return len(edge_set)
 
+# Imposes restrictions on func, func(a,b) should be always called as func(a, b, None) or func(a, b, dump_file=None)
+def dumper(func):
+    def wrapper(*args, **kwargs):
+	import os
+	def modify_kwargs():
+	    # remove dump_file argument
+	    from copy import deepcopy
+	    kwargs_mod = deepcopy(kwargs) 
+	    del kwargs_mod["dump_file"]
+	    return kwargs_mod
+	#print args, kwargs
+	if "dump_file" in kwargs:
+	    #raise ValueError("dump_file argument not provided")
+	    dump_file = kwargs["dump_file"]
+	    #kwargs_mod = modify_kwargs()
+	    kwargs_mod = kwargs
+	    args_mod = args
+	else: # assuming the last argument as dump_file
+	    dump_file = args[-1]
+	    #args_mod = args[:-1]
+	    kwargs_mod = kwargs
+	    args_mod = args
+	#print args_mod, kwargs_mod
+	if dump_file is not None:
+	    if os.path.exists(dump_file):
+	       val = cPickle.load(open(dump_file)) 
+	       #print "loading", dump_file
+	    else:
+		# remove dump_file argument
+		#print "dumping", dump_file, kwargs_mod
+		val = func(*args_mod, **kwargs_mod)
+		cPickle.dump(val, open(dump_file, 'w'))
+	else:
+	    #print "running", kwargs_mod
+	    val = func(*args_mod, **kwargs_mod)
+	return val
+    return wrapper
+
+@dumper
+def test(a, b, dump_file=None):
+    print a + b
+    return
+
+@dumper
+def get_shortest_paths(G, dump_file):
+    return networkx.shortest_path(G)
+    #if dump_file is not None:
+    #	if os.path.exists(dump_file):
+    #	   sp = cPickle.load(open(dump_file)) 
+    #	else:
+    #	    sp = networkx.shortest_path(G)
+    #	    cPickle.dump(sp, open(dump_file, 'w'))
+    #else:
+    #	sp = networkx.shortest_path(G)
+    #return sp
+
+@dumper
+def get_shortest_path_lengths(G, dump_file):
+    return networkx.shortest_path_length(G)
 
 def get_shortest_path_between(G, source_id, target_id):
     return networkx.shortest_path(G, source_id, target_id)
 
-
 def get_all_shortest_paths_between(G, source_id, target_id):
     return networkx.all_shortest_paths(G, source_id, target_id)
-
 
 def get_all_paths_from(G, source_id): 
     """
@@ -78,34 +132,84 @@ def get_all_paths_from(G, source_id):
     """
     return networkx.single_source_dijkstra_path(G, source_id)
 
+@dumper
+def get_node_betweenness(G, dump_file):
+    return networkx.betweenness_centrality(G)
 
-def get_edge_betweenness_within_subset(G, subset, edges):
+@dumper
+def get_edge_betweenness(G, dump_file):
+    return networkx.edge_betweenness_centrality(G)
+
+def get_edge_betweenness_within_subset(G, subset, edges, consider_alternative_paths=False):
     """
 	Calculate edge (relative) betweenness within the paths of a given subset of nodes
 	edges is a list of (source, target) pairs for which betweenness is calculated
 	Assumes connected component (there is a bath between any two nodes)
-	##In case there are multiple shortest paths, the edge is counted if it is in any of them
+	consider_alternative_paths: In case there are multiple shortest paths, the edge is counted if it is in any of them
+	Returns a dictionary where values are lists of existance of edge in the shortest path(s) of each edge pair
     """
     edge_to_values = {}
-    for i, u in enumerate(subset):
-	#print i, u, len(subset)
-	for j, v in enumerate(subset):
-	    if j>=i:
-		continue
-	    paths_gen = networkx.all_shortest_paths(G, u, v)
-	    paths = [ [ p for p in path_gen ] for path_gen in paths_gen ]
-	    for s, t in edges:
-		count = 0
-		total = 0
-		for path in paths:
-		    #path = [ p for p in path_gen ]
+    if consider_alternative_paths:
+	for i, u in enumerate(subset):
+	    #print i, u, len(subset)
+	    for j, v in enumerate(subset):
+		if j>=i:
+		    continue
+		paths_gen = networkx.all_shortest_paths(G, u, v)
+		paths = [ [ p for p in path_gen ] for path_gen in paths_gen ]
+		for s, t in edges:
+		    count = 0
+		    total = 0
+		    for path in paths:
+			#path = [ p for p in path_gen ]
+			for k in range(1, len(path)):
+			    if (path[k-1], path[k]) == (s, t) or (path[k-1], path[k]) == (t, s):
+				count += 1
+				break
+			total += 1
+		    edge_to_values.setdefault((s,t), []).append(float(count)/total)
+    else:
+	for i, u in enumerate(subset):
+	    paths = networkx.shortest_path(G, u)
+	    for j, v in enumerate(subset):
+		if j>=i:
+		    continue
+		for s, t in edges:
+		    count = 0
+		    path = paths[v]
 		    for k in range(1, len(path)):
 			if (path[k-1], path[k]) == (s, t) or (path[k-1], path[k]) == (t, s):
 			    count += 1
-		    total += 1
-		edge_to_values.setdefault((s,t), []).append(float(count)/total)
-    return edge_to_values 
+			    break
+		    edge_to_values.setdefault((s,t), []).append(count)
+    edge_to_value = {}
+    for edge, values in edge_to_values.iteritems():
+	edge_to_value[edge] = float(sum(values)) / len(values)
+    return edge_to_value
 
+def get_degree_binning(g, bin_size):
+    degree_to_nodes = {}
+    for node, degree in g.degree().iteritems():
+	degree_to_nodes.setdefault(degree, []).append(node)
+    values = degree_to_nodes.keys()
+    values.sort()
+    bins = []
+    i = 0
+    while i < len(values):
+	low = values[i]
+	val = len(degree_to_nodes[values[i]])
+	while val < bin_size:
+	    i += 1
+	    if i == len(values):
+		break
+	    val += len(degree_to_nodes[values[i]])
+	if i == len(values):
+	    i -= 1
+	high = values[i]
+	i += 1 
+	#print low, high, val
+	bins.append((low, high, val))
+    return bins
 
 def get_pairwise_distances_between_nodes(g, sources, targets=None):
     symetric = False
