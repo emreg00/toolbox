@@ -87,7 +87,7 @@ def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score
 
     # Create random network files for netzcore
     print "Creating random networks (for netzcore)"
-    sampling_prefix = scoring_folder + "sampled_graph."
+    sampling_prefix = scoring_folder + "../"  + "sampled_graph."
     if os.path.exists(sampling_prefix+"%s"%n_sample):
 	print "\tSampled networks exists, skipping this step!"
     else:
@@ -185,11 +185,11 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
     def score(scoring_type, qname, node_file, edge_file, output_file, parameters):
 	output_file += ".%s" % scoring_type
 	if scoring_type == "netscore": 
-	    score_command = executable_path + " -s s -n %s -e %s -o %s -r %d -i %d" % (node_file, edge_file, output_file, parameters["n_repetition"], parameters["n_iteration"])
+	    score_command = executable_path + ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, edge_file, output_file, parameters["n_repetition"], parameters["n_iteration"])
 	elif scoring_type == "netzcore": 
-	    score_command = executable_path + " -s z -n %s -e %s -o %s -i %d -x %d -d %s" % (node_file, edge_file, output_file, parameters["n_iteration"], parameters["n_sample"], parameters["sampling_prefix"])
+	    score_command = executable_path + ' -s z -n "%s" -e "%s" -o "%s" -i %d -x %d -d "%s"' % (node_file, edge_file, output_file, parameters["n_iteration"], parameters["n_sample"], parameters["sampling_prefix"])
 	elif scoring_type == "netshort": 
-	    score_command = executable_path + " -s d -n %s -e %s -o %s" % (node_file, parameters["nd_edge_file"], output_file)
+	    score_command = executable_path + ' -s d -n "%s" -e "%s" -o "%s"' % (node_file, parameters["nd_edge_file"], output_file)
 	else:
 	    raise ValueError("Invalid scoring type!")
 	if qname is None:
@@ -209,15 +209,13 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
     bg_node_file = scoring_folder + name + "node_scores_background.sif" 
     bg_seed_file = scoring_folder + name + "seed_scores_background.sif" 
     nd_edge_file = scoring_folder + name + "edge_scores_netshort.sif"
-    sampling_prefix = scoring_folder + "sampled_graph."
+    sampling_prefix = scoring_folder + "../" + "sampled_graph."
     output_file = scoring_folder + name + "output_scores.sif"
     bg_output_file = scoring_folder + name + "output_scores_background.sif"
     if not os.path.exists(node_file) or not os.path.exists(edge_file):
 	print "Input files not found!\nMake sure that you have run prepare_scoring first and that you provide the correct path."
 	return
     # Run scoring algorithm
-    parameters["sampling_prefix"] = sampling_prefix
-
     if scoring_type == "netcombo":
 
 	# NetScore, NetZcore, NetShort
@@ -225,7 +223,7 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
 	    if scoring == "netscore":
 		parameters={"n_repetition":3, "n_iteration":2}
 	    elif scoring == "netzcore":
-		parameters={"n_iteration":5, "n_sample":100, "sampling_prefix":scoring_folder+"sampled_graph."}
+		parameters={"n_iteration":5, "n_sample":100, "sampling_prefix":sampling_prefix}
 	    elif scoring == "netshort":
 		parameters={"nd_edge_file":nd_edge_file}
 	    else:
@@ -253,6 +251,8 @@ def run_scoring(scoring_folder, executable_path, scoring_type="netscore", parame
 		    score_combined(scoring, qname, bg_node_file+".%d" % i, edge_file, bg_output_file+".%d" % i, parameters)
 		    output_pvalue_file(output_file+".netcombo"+".%d" % i, bg_output_file+".netcombo"+".%d" % i, None, bg_seed_file)
     else:
+	#if "sampling_prefix" not in parameters:
+	#    parameters["sampling_prefix"] = sampling_prefix
 	score(scoring_type, qname, node_file, edge_file, output_file, parameters)
 	if xval is not None:
 	    for i in range(1, xval+1):

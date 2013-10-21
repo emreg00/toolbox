@@ -174,6 +174,24 @@ def get_drug_info(drug_info_file):
         drug_to_values[words[0]] = words[1:]
     return col_to_idx, drug_to_values
 
+def get_disease_specific_drugs(parser, phenotypes):
+    import re
+    #keywords = ["cancer", "neoplasm", "leukemia", "lymphoma", "carcinoma", "melanoma"]
+    #exps = [ re.compile(keyword) for keyword in keywords ]
+    exps = [ re.compile(keyword.lower()) for keyword in phenotypes ]
+    disease_to_drugs = {}
+    for drug, indication in parser.drug_to_indication.iteritems():
+	if indication is None:
+	    continue
+	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
+	    #disease = keywords[0]
+	    #disease_to_drugs.setdefault(disease, set()).add(drug)
+	for disease, exp in zip(phenotypes, exps):
+	    if exp.search(indication) is not None:
+		disease_to_drugs.setdefault(disease, set()).add(drug)
+    return disease_to_drugs
+
+
 def get_drug_targets(file_name, drugs_file=None):
     parser = DrugBankXMLParser(file_name)
     parser.parse()

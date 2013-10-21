@@ -29,7 +29,7 @@
 #########################################################################
 
 import networkx, random, copy
-import os, cPickle
+import os, cPickle, numpy
 
 #MIN_NUMBER_OF_PERTURBATION = 25
 MAX_NUMBER_OF_TRIAL = 6
@@ -187,6 +187,51 @@ def get_edge_betweenness_within_subset(G, subset, edges, consider_alternative_pa
 	edge_to_value[edge] = float(sum(values)) / len(values)
     return edge_to_value
 
+def get_source_to_average_target_distance(sp, geneids_source, geneids_target, distance="shortest", target_mean_and_std = None, exclude_self = False):
+    """
+    Returns average/min distance to target nodes for each source node
+    If target_mean_and_std is provided calculatesn z-score using mean & std of the distance to target from every node
+    in addition to the raw distance (first z-score, then raw score)
+    """
+    if exclude_self: assert geneids_source == geneids_target
+    source_to_target_distance = {}
+    for geneid in geneids_source:
+	if distance.startswith("net"): # GUILD scores
+	    if target_mean_and_std is not None:
+		raise ValueError("Normalization is not available for this metric!")
+	    val = sp[geneid]
+	else:
+	    lengths = sp[geneid]
+	    values = []
+	    for geneid_target in geneids_target:
+		if exclude_self:
+		    if geneid == geneid_target:
+			continue
+		if target_mean_and_std is not None:
+		    m, s = target_mean_and_std[geneid] # source are drug targets - before [geneid_target] 
+		    val = lengths[geneid_target] - m
+		    if val == 0:
+			val = val
+		    else:
+			val = val / s  
+		else:
+		    val = lengths[geneid_target]
+		values.append(val)
+	    #if len(values) == 0:
+	    #	continue
+	    if distance == "shortest":
+		val = numpy.mean(values) 
+	    elif distance == "kernel":
+		val = -numpy.log(numpy.sum([numpy.exp(-(value*value)) for value in values])) / len(values)
+	    elif distance == "kernel2":
+		val = -numpy.log(numpy.sum([numpy.exp(-value) for value in values])) / len(values)
+	    elif distance == "closest":
+		val = min(values)
+	    else:
+		raise ValueError("Unknown distance type " + distance)
+	source_to_target_distance[geneid] = val
+    return source_to_target_distance
+
 def get_degree_binning(g, bin_size):
     degree_to_nodes = {}
     for node, degree in g.degree().iteritems():
@@ -197,19 +242,35 @@ def get_degree_binning(g, bin_size):
     i = 0
     while i < len(values):
 	low = values[i]
-	val = len(degree_to_nodes[values[i]])
-	while val < bin_size:
+	val = degree_to_nodes[values[i]]
+	while len(val) < bin_size:
 	    i += 1
 	    if i == len(values):
 		break
-	    val += len(degree_to_nodes[values[i]])
+	    val.extend(degree_to_nodes[values[i]])
 	if i == len(values):
 	    i -= 1
 	high = values[i]
 	i += 1 
-	#print low, high, val
-	bins.append((low, high, val))
+	#print low, high, len(val)
+	if len(val) < bin_size:
+	    low_, high_, val_ = bins[-1]
+	    bins[-1] = (low_, high, val_ + val)
+	else:
+	    bins.append((low, high, val))
     return bins
+
+def get_degree_equivalents(seeds, bins, g):
+    seed_to_nodes = {}
+    for seed in seeds:
+	d = g.degree(seed)
+	for l, h, nodes in bins:
+	    if l <= d and h >= d:
+		mod_nodes = list(nodes)
+		mod_nodes.remove(seed)
+		seed_to_nodes[seed] = mod_nodes
+		break
+    return seed_to_nodes
 
 def get_pairwise_distances_between_nodes(g, sources, targets=None):
     symetric = False
