@@ -195,6 +195,10 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
     """
     if exclude_self: assert geneids_source == geneids_target
     source_to_target_distance = {}
+    if distance.startswith("mahalanobis"):
+	# find center of seed subnetwork (g-spot)
+	center, center_values = get_center_of_subnetwork(sp, geneids_target)
+	center_values = numpy.array(center_values)
     for geneid in geneids_source:
 	if distance.startswith("net"): # GUILD scores
 	    if target_mean_and_std is not None:
@@ -221,16 +225,106 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	    #	continue
 	    if distance == "shortest":
 		val = numpy.mean(values) 
+	    elif distance == "shortest2":
+		values = numpy.array(values)
+		val = numpy.mean(values*values)
 	    elif distance == "kernel":
-		val = -numpy.log(numpy.sum([numpy.exp(-(value*value)) for value in values])) / len(values)
+		val = -numpy.log(numpy.sum([numpy.exp(-value-1) for value in values])) / len(values)
 	    elif distance == "kernel2":
-		val = -numpy.log(numpy.sum([numpy.exp(-value) for value in values])) / len(values)
+		val = -numpy.log(numpy.sum([numpy.exp(-((value+1)*(value+1))) for value in values])) / len(values)
 	    elif distance == "closest":
 		val = min(values)
+	    elif distance.startswith("knn-"):
+		values.sort()
+		k = int(distance[-1])
+		val = numpy.mean(values[:k])
+	    elif distance == "mahalanobis":
+		d = numpy.array(values) - center_values
+		val = d / numpy.std(center_values)
+		val = numpy.mean(val)
+	    elif distance == "mahalanobis2":
+		d = numpy.array(values) - center_values
+		val = d / numpy.std(center_values)
+		val *= val
+		val = numpy.mean(val)
 	    else:
 		raise ValueError("Unknown distance type " + distance)
 	source_to_target_distance[geneid] = val
     return source_to_target_distance
+
+def get_source_to_average_target_overlap(network, geneids_source, geneids_target, distance="tom"):
+    """
+    Get TOM & MTOM
+    """
+    source_to_target_distance = {}
+    if distance == "tom":
+	for geneid in geneids_source:
+	    neighbors1 = network.neighbors(geneid)
+	    values = []
+	    for geneid_target in geneids_target:
+		neighbors2 = network.neighbors(geneid_target)
+		val = float(len(set(neighbors1)&set(neighbors2)))
+		if network.has_edge(geneid, geneid_target):
+		    val += 1
+		val /= min(len(neighbors1),len(neighbors2)) + 1
+		values.append(val)
+	    source_to_target_distance[geneid] = 1-numpy.mean(values)
+    elif distance == "mtom":
+	count = 0
+	for i, geneid_target1 in enumerate(geneids_target):
+	    for j, geneid_target2 in enumerate(geneids_target):
+		if i < j:
+		    if network.has_edge(geneid_target1, geneid_target2):
+			count += 1
+	print count
+	for geneid in geneids_source:
+	    divisor = 99999
+	    genes = set(geneids_target)
+	    genes.add(geneid)
+	    for gene1 in genes:
+		common_neighbors = set()
+		for gene2 in genes:
+		    if gene1 == gene2:
+			continue
+		    neighbors = network.neighbors(gene2)
+		    common_neighbors &= set(neighbors)
+		if len(common_neighbors) < divisor:
+		    divisor = len(common_neighbors)
+	    common_neighbors = set(network.neighbors(geneid))
+	    for geneid_target in geneids_target:
+		neighbors = network.neighbors(geneid_target)
+		common_neighbors &= set(neighbors)
+	    val = float(len(common_neighbors))
+	    for geneid_target in geneids_target:
+		if network.has_edge(geneid, geneid_target):
+		    val += 1
+	    val += count
+	    k = len(genes)
+	    val /= divisor + (k * (k-1) / 2)
+	    source_to_target_distance[geneid] = 1-val 
+    else:
+	raise ValueError("Unknown distance type " + distance)
+    return source_to_target_distance
+
+
+def get_center_of_subnetwork(sp, nodes):
+    center = None
+    center_d = 99999
+    center_values = []
+    for i, node1 in enumerate(nodes):
+	lengths = sp[node1]
+	values = []
+	for j, node2 in enumerate(nodes):
+	    if i == j:
+		values.append(0)
+	    else:
+		values.append(lengths[node2])
+	d = sum(values)
+	if d < center_d:
+	    center = node1
+	    center_d = d
+	    center_values = values
+    return center, center_values
 
 def get_degree_binning(g, bin_size):
     degree_to_nodes = {}
