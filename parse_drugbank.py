@@ -26,6 +26,8 @@ class DrugBankXMLParser(object):
     def __init__(self, filename):
 	self.file_name = filename
 	self.drug_to_name = {}
+	self.drug_to_brands = {}
+	self.drug_to_synonyms = {}
 	self.drug_to_description = {}
 	self.drug_to_groups = {}
 	self.drug_to_indication = {}
@@ -38,6 +40,8 @@ class DrugBankXMLParser(object):
 	return
 
     def parse(self, selected_names=None, exp=None):
+	#exp1 = re.compile("(.+) [(].*[)]")
+	#exp2 = re.compile("(.+) [\[].*[\]]")
 	# get an iterable
 	context = iterparse(self.file_name, ["start", "end"])
 	# turn it into an iterator
@@ -62,6 +66,30 @@ class DrugBankXMLParser(object):
 		if elem.tag == self.NS+"name":
 		    if state_stack[-2] == self.NS+"drug":
 			self.drug_to_name[drug_id] = elem.text
+		if elem.tag == self.NS+"brand":
+		    if state_stack[-2] == self.NS+"brands" and state_stack[-3] == self.NS+"drug":
+			brand = elem.text
+			#idx = brand.find("(")
+			#if idx != -1:
+			#    brand = brand[:idx]
+			idx = brand.find(" [")
+			if idx != -1:
+			    brand = brand[:idx]
+			brand = brand.strip().encode('ascii','ignore')
+			if brand != "":
+			    self.drug_to_brands.setdefault(drug_id, set()).add(brand) 
+		if elem.tag == self.NS+"synonym":
+		    if state_stack[-2] == self.NS+"synonyms" and state_stack[-3] == self.NS+"drug":
+			synonym = elem.text
+			#idx = synonym.find("(")
+			#if idx != -1:
+			#    synonym = synonym[:idx]
+			idx = synonym.find(" [")
+			if idx != -1:
+			    synonym = synonym[:idx]
+			synonym = synonym.strip().encode('ascii','ignore')
+			if synonym != "":
+			    self.drug_to_synonyms.setdefault(drug_id, set()).add(synonym) 
 		if elem.tag == self.NS+"drugbank-id":
 		    if state_stack[-2] == self.NS+"drug":
 			drug_id = elem.text
@@ -132,19 +160,19 @@ def output_drug_info(file_name, output_file):
     f = open(output_file, 'w')
     f.write("drugbank id\tname\tgroups\tpubchem id\tdescription\tindication\ttargets\n")
     for drug, name in parser.drug_to_name.iteritems():
-        name = name.encode('ascii','replace')
+        name = name.encode('ascii','ignore')
         try:
             groups = parser.drug_to_groups[drug]
         except:
             groups = []
         try:
             description = parser.drug_to_description[drug]
-            description = description.replace("\n", "").encode('ascii','replace')
+            description = description.replace("\n", "").encode('ascii','ignore')
         except:
             description = ""
         try:
             indication = parser.drug_to_indication[drug]
-            indication = indication.replace("\n", "").encode('ascii','replace')
+            indication = indication.replace("\n", "").encode('ascii','ignore')
         except:
             #print drug
             indication = ""
