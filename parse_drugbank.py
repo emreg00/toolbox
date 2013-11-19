@@ -140,6 +140,19 @@ class DrugBankXMLParser(object):
                 self.drug_to_targets.setdefault(drug, set()).add(uniprot)
 	return 
 
+    def get_synonyms(self):
+	name_to_drug = {}
+	for drug, name in self.drug_to_name.iteritems():
+	    name_to_drug[name.lower()] = drug
+	synonym_to_drug = {}
+	for drug, synonyms in self.drug_to_synonyms.iteritems():
+	    for synonym in synonyms:
+		synonym_to_drug[synonym.lower()] = drug
+	for drug, brands in self.drug_to_brands.iteritems():
+	    for brand in brands:
+		synonym_to_drug[brand.lower()] = drug
+	return name_to_drug, synonym_to_drug
+
 def get_drugs_for_targets(file_name, output_file):
     parser = DrugBankXMLParser(file_name)
     parser.parse()
@@ -206,7 +219,7 @@ def get_disease_specific_drugs(parser, phenotypes):
     import re
     #keywords = ["cancer", "neoplasm", "leukemia", "lymphoma", "carcinoma", "melanoma"]
     #exps = [ re.compile(keyword) for keyword in keywords ]
-    exps = [ re.compile(keyword.lower()) for keyword in phenotypes ]
+    #exps = [ re.compile(keyword.lower()) for keyword in phenotypes ]
     disease_to_drugs = {}
     for drug, indication in parser.drug_to_indication.iteritems():
 	if indication is None:
@@ -214,8 +227,12 @@ def get_disease_specific_drugs(parser, phenotypes):
 	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
 	    #disease = keywords[0]
 	    #disease_to_drugs.setdefault(disease, set()).add(drug)
-	for disease, exp in zip(phenotypes, exps):
-	    if exp.search(indication) is not None:
+	#for disease, exp in zip(phenotypes, exps):
+	#    if exp.search(indication.lower()) is not None:
+	#	disease_to_drugs.setdefault(disease, set()).add(drug)
+	indication = indication.lower()
+	for disease in phenotypes:
+	    if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
 		disease_to_drugs.setdefault(disease, set()).add(drug)
     return disease_to_drugs
 
