@@ -21,6 +21,9 @@ class Configuration():
     def get(self, var_name):
 	return self.config.get(self.config_section, var_name) 
 
+    def get_boolean(self, var_name):
+	return self.config.getboolean(self.config_section, var_name) 
+
 # CONFIG = configuration.get_configuration(CONFIG_FILE, CONFIG_SECTION) 
 #def get_configuration(config_file=CONFIG_FILE, config_section=CONFIG_SECTION, var_name=None):
 #    config = ConfigParser.SafeConfigParser()

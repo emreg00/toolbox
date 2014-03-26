@@ -140,18 +140,25 @@ class DrugBankXMLParser(object):
                 self.drug_to_targets.setdefault(drug, set()).add(uniprot)
 	return 
 
-    def get_synonyms(self):
+    def get_synonyms(self, drugs_with_target=None):
 	name_to_drug = {}
 	for drug, name in self.drug_to_name.iteritems():
+	    if drugs_with_target is not None and drug not in drugs_with_target:
+		continue
 	    name_to_drug[name.lower()] = drug
 	synonym_to_drug = {}
 	for drug, synonyms in self.drug_to_synonyms.iteritems():
 	    for synonym in synonyms:
+		if drugs_with_target is not None and drug not in drugs_with_target:
+		    continue
 		synonym_to_drug[synonym.lower()] = drug
 	for drug, brands in self.drug_to_brands.iteritems():
 	    for brand in brands:
+		if drugs_with_target is not None and drug not in drugs_with_target:
+		    continue
 		synonym_to_drug[brand.lower()] = drug
 	return name_to_drug, synonym_to_drug
+
 
 def get_drugs_for_targets(file_name, output_file):
     parser = DrugBankXMLParser(file_name)
@@ -221,6 +228,7 @@ def get_disease_specific_drugs(parser, phenotypes):
     #exps = [ re.compile(keyword) for keyword in keywords ]
     #exps = [ re.compile(keyword.lower()) for keyword in phenotypes ]
     disease_to_drugs = {}
+    indication_to_diseases = {}
     for drug, indication in parser.drug_to_indication.iteritems():
 	if indication is None:
 	    continue
@@ -232,8 +240,41 @@ def get_disease_specific_drugs(parser, phenotypes):
 	#	disease_to_drugs.setdefault(disease, set()).add(drug)
 	indication = indication.lower()
 	for disease in phenotypes:
-	    if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
+	    #if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
+	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
+	    disease_mod = disease.replace(" and ", ", ")
+	    phrases = disease_mod.split(",")
+	    values = []
+	    for phrase in phrases:
+		inner_values = []
+		words = phrase.strip().split()
+		for i, token in enumerate(words):
+		    if token.endswith("'s"):
+			token = token[:-2]
+		    if i == len(words) - 1:
+			if token[-1] == "s":
+			    token = token[:-1]
+		    if token in ("disease", "disorder", "syndrome"):
+			continue
+		    inner_values.append(token)
+		#if len(inner_values) > 0:
+		values.append(" ".join(inner_values))
+	    #print disease, values
+	    if all([ indication.find(word.strip()) != -1 for word in values ]):
+		#print disease, drug
 		disease_to_drugs.setdefault(disease, set()).add(drug)
+		indication_to_diseases.setdefault(indication, set()).add(disease)
+	    else:
+		indication_to_diseases.setdefault(indication, set())
+    # Print non-matching indications #!
+    for indication, diseases in indication_to_diseases.iteritems():
+	if len(diseases) == 0:
+	    continue
+	    print indication.encode('ascii','ignore')
+	elif indication.find(" not ") != -1 or indication.find(" except ") != -1:
+	    continue
+	    print diseases, indication.encode('ascii','ignore')
+    #print disease_to_drugs["diabetes mellitus, type 2"] 
     return disease_to_drugs
 
 

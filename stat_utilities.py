@@ -53,6 +53,8 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
 	#for rank, vals in enumerate(values):
 	    #pvalue, i = vals
 	    #new_pvalues[i] = (n/(rank+1)) * pvalue
+    else:
+	raise ValueError("Unknown correction type: " + correction_type)
     return new_pvalues
 
 def calc_mean_and_sigma(alist):
@@ -93,6 +95,14 @@ def statistical_test(x, y, test_type="wilcoxon"):
     # else:
     #	pval = 1 - pval[1] / 2
     return stat, pval
+
+def hypergeometric_test(picked_good, picked_all, all_all, all_good):
+    k = len(picked_good) 
+    M = len(all_all) 
+    n = len(all_good) 
+    N = len(picked_all) 
+    val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
+    return val
 
 def density_estimation(self, occurences, possible_values):
     kde = stats.gaussian_kde(map(float, occurences))

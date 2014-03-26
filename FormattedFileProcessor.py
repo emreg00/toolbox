@@ -1,10 +1,9 @@
-import sets
 
 class FormattedFileProcessor(object):
     """
 	Wrapper around reading/processing various formatted input streams
     """
-    allowed_formats = sets.Set(["sif", "fasta", "tsv"])
+    allowed_formats = set(["sif", "fasta", "tsv"])
     def __init__(self, input_file_name, input_type, delim, inner_delim=None):
 	"""
 	    Initialize an object of this class storing 

@@ -38,7 +38,7 @@ class TsvReader(FormattedFileProcessor):
 	file = open(self.input_file_name)
 	# Read header
 	line = file.readline()
-	cols = [ c.lower() for c in line.strip().split(self.delim) ]
+	cols = [ c.lower() for c in line.strip("\n").split(self.delim) ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	    fields_to_include = []
@@ -61,7 +61,7 @@ class TsvReader(FormattedFileProcessor):
 	    keys_to_include = set(keys_to_include)
 	while line:
 	    try:
-		vals = line.rstrip().split(self.delim)
+		vals = line.rstrip("\n").split(self.delim)
 		id = vals[columns[first_column]]
 		if keys_to_include is None or id in keys_to_include:
 		    new_vals = []
@@ -97,7 +97,7 @@ class TsvReader(FormattedFileProcessor):
 	"""
 	file = open(self.input_file_name)
 	line = file.readline()
-	cols = [ c.lower() for c in line.strip().split('\t') ]
+	cols = [ c.lower() for c in line.strip("\n").split('\t') ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	else:
@@ -109,11 +109,11 @@ class TsvReader(FormattedFileProcessor):
 	i=0
 	line_prev = line
 	line = file.readline()
-	vals = line.strip().split('\t')
+	vals = line.strip("\n").split('\t')
 	#print vals
 	while line:
 	    try:
-		vals = line.strip().split('\t')
+		vals = line.strip("\n").split('\t')
 		id = vals[columns[first_column]]
 		if keys_to_include is None or id in keys_to_include:
 		    if out_method is None:

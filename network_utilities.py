@@ -31,8 +31,13 @@
 import networkx, random, copy
 import os, cPickle, numpy
 
+try:
+    from scipy.stats import rankdata
+except:
+    print "SCIPY is not intalled, rank-based distance methods wont work"
+
 #MIN_NUMBER_OF_PERTURBATION = 25
-MAX_NUMBER_OF_TRIAL = 6
+MAX_NUMBER_OF_TRIAL = 10
 
 def main():
     g = create_network_from_sif_file("interactions.sif")
@@ -52,6 +57,23 @@ def create_graph():
 
 def create_graph_with_same_type(G):
     return create_empty_copy(G)
+
+def create_random_graphs(G, n_random, randomization_type, allow_self_edges, out_prefix):
+    for i in xrange(n_random):
+	g = randomize_graph(G, randomization_type, allow_self_edges)
+	dump_file = "%s_%d.pcl" % (out_prefix, i)
+	cPickle.dump(g, open(dump_file, 'w'))
+	dump_file = "%s_sp_%d.pcl" % (out_prefix, i)
+	sp = get_shortest_path_lengths(g, dump_file)
+    return
+
+def get_random_graphs(n_random, out_prefix):
+    for i in xrange(n_random):
+	dump_file = "%s_%d.pcl" % (out_prefix, i)
+	g = cPickle.load(open(dump_file))
+	dump_file = "%s_sp_%d.pcl" % (out_prefix, i)
+	sp = cPickle.load(open(dump_file))
+	yield i, g, sp
 
 def get_number_of_distinct_edges(G):
     edge_list = G.edges()
@@ -187,6 +209,62 @@ def get_edge_betweenness_within_subset(G, subset, edges, consider_alternative_pa
 	edge_to_value[edge] = float(sum(values)) / len(values)
     return edge_to_value
 
+
+def get_background_normalized_separation_distance(network, sp, targets, seeds, distance="shortest", n_random=100, n_node_in_bins=500, seed_to_equivalent_nodes = None):
+    # Get equivalent nodes from bins
+    if seed_to_equivalent_nodes is None:
+	bins = get_degree_binning(network, n_node_in_bins)
+	seed_to_equivalent_nodes = get_degree_equivalents(seeds, bins, network)
+    # Get original score
+    d = get_separation(network, sp, targets, seeds, distance)
+    values = numpy.empty(n_random)
+    for i in xrange(n_random):
+	nodes = []
+	for seed, equivalents in seed_to_equivalent_nodes.iteritems():
+	    nodes.append(random.choice(equivalents))
+	d_random = get_separation(network, sp, targets, nodes, distance = distance)
+	values[i] = d_random
+    m, s = numpy.mean(values), numpy.std(values)
+    d -= m
+    if s != 0:
+	d /= s
+    return d
+
+
+def get_source_to_average_target_distance_random(sp, targets, nodes, distance, target_mean_and_std, seed_to_equivalent_nodes, n_random = 100):
+    target_to_values = {}
+    # Calculate distances of N "equivalent" seeds repeating some hundred times
+    for i in xrange(n_random):
+	nodes = []
+	for seed, equivalents in seed_to_equivalent_nodes.iteritems():
+	    nodes.append(random.choice(equivalents))
+	target_to_distance_random = get_source_to_average_target_distance(sp, targets, nodes, distance = distance, target_mean_and_std = target_mean_and_std) 
+	# Assign the average of all seeds to each target
+	for target in targets:
+	    target_to_values.setdefault(target, []).append(target_to_distance_random[target])
+    return target_to_values
+
+def get_normalized_source_to_target_distance(target_to_distance, target_to_values = None):
+    target_to_normalized_distance = {}
+    targets = target_to_distance.keys()
+    #values = numpy.empty(len(targets))
+    for i, target in enumerate(targets):
+	if target_to_values is not None: # Normalize using taget_to_values
+	    arr = numpy.array(target_to_values[target])
+	    m, s = numpy.mean(arr), numpy.std(arr)
+	    val = target_to_distance[target] - m
+	    if val == 0:
+		z = val
+	    else:
+		z = val / s
+	else:
+	    z = target_to_distance[target] 
+	#values[i] = z
+	target_to_normalized_distance[target] = z
+    #arr = numpy.sort(values)
+    return target_to_normalized_distance #numpy.mean(arr), numpy.std(arr) # numpy.min(arr)
+
+
 def get_source_to_average_target_distance(sp, geneids_source, geneids_target, distance="shortest", target_mean_and_std = None, exclude_self = False):
     """
     Returns average/min distance to target nodes for each source node
@@ -199,9 +277,27 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	# find center of seed subnetwork (g-spot)
 	center, center_values = get_center_of_subnetwork(sp, geneids_target)
 	#center_values = numpy.array(center_values)
+	if distance == "mahalanobis-closest" or distance == "mahalanobis-shortest":
+	    center_d = numpy.mean(center_values)
+	elif distance == "mahalanobis-kernel": 
+	    center_d = -numpy.log(numpy.mean([numpy.exp(-value) for value in center_values]))
     elif distance == "jorg.individual":
 	target_to_distance = get_source_to_average_target_distance(sp, geneids_target, geneids_target, distance = "closest", target_mean_and_std = None, exclude_self=True)
-	d = numpy.mean(target_to_distance.values())
+	center_d = numpy.mean(target_to_distance.values())
+    elif distance.startswith("rank-"):
+	source_to_values = {}
+	for geneid in geneids_target:
+	    lengths = sp[geneid]
+	    ranks = rankdata(lengths.values())
+	    for i, geneid_source in enumerate(lengths.keys()):
+		if geneid_source in geneids_source:
+		    source_to_values.setdefault(geneid_source, []).append(ranks[i])
+	for geneid_source, values in source_to_values.iteritems():
+	    if distance[len("rank-"):] in ("closest", "closest-min"):
+		source_to_target_distance[geneid_source] = numpy.min(values)
+	    elif distance[len("rank-"):] == ("shortest", "shortest-min"):
+		source_to_target_distance[geneid_source] = numpy.mean(values)
+	return source_to_target_distance
     for geneid in geneids_source:
 	if distance.startswith("net"): # GUILD scores
 	    if target_mean_and_std is not None:
@@ -218,7 +314,10 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		    if geneid == geneid_target:
 			continue
 		j = name_to_idx[geneid_target]
-		val = DSD[i, j]
+		if distance.startswith("communicability"):
+		    val = 1 - DSD[i, j]
+		else:
+		    val = DSD[i, j]
 		values.append(val)
 	    val = numpy.mean(values) 
 	elif distance == "center":
@@ -241,68 +340,70 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		    else:
 			val = val / s  
 		else:
-		    val = lengths[geneid_target]
+		    if geneid_target not in lengths:
+			print "Warning: node not connected", geneid_target
+			val = 999
+		    else:
+			val = lengths[geneid_target]
 		values.append(val)
 	    if exclude_self and len(values) == 0: # for jorg separation metric with sets of one gene
 	    	values = [0]
-	    if distance == "shortest":
+	    if distance == "shortest" or distance == "shortest-min":
 		val = numpy.mean(values) 
 	    elif distance == "shortest2":
 		values = numpy.array(values)
 		val = numpy.sqrt(numpy.mean(values*values))
-	    elif distance == "kernel":
-		val = -numpy.log(numpy.sum([numpy.exp(-value-1) for value in values])) / len(values)
-	    elif distance == "kernel2":
-		val = -numpy.log(numpy.sum([numpy.exp(-((value+1)*(value+1))) for value in values])) / len(values)
-	    elif distance == "closest":
+	    elif distance == "kernel" or distance == "kernel-min":
+		val = -numpy.log(numpy.mean([numpy.exp(-value-1) for value in values])) 
+	    elif distance == "closest" or distance == "closest-min":
 		val = min(values)
+	    elif distance == "closest-adjust":
+		values.sort()
+		val_min = values[0]
+		k = -1
+		for val in values:
+		    if val == val_min:
+			k += 1
+		    else:
+			break
+		val = val_min - k / 100.0 # scale by number of target nodes at that distance
 	    elif distance.startswith("knn-"):
 		values.sort()
 		k = int(distance[-1])
 		val = numpy.mean(values[:k])
-	    elif distance == "jorg-individual":
-		val = min(values) - d
-	    elif distance == "mahalanobis":
-		d = numpy.array(values) - center_values
-		val = numpy.mean(d)
-		std = numpy.std(center_values)
-		if std > 0:
-		    val /= std
-	    elif distance == "mahalanobis-x":
-		d = numpy.array(values) - center_values
-		val = d
-		std = numpy.std(center_values)
-		if std > 0:
-		    val /= std
-	    elif distance == "mahalanobis-min":
-		d = numpy.array(values) - center_values
-		val = numpy.min(d)
-		std = numpy.std(center_values)
-		if std > 0:
-		    val /= std
-	    elif distance == "mahalanobis-nostd":
-		d = numpy.array(values) - center_values
-		val = numpy.mean(d)
-		std = numpy.std(center_values)
-	    elif distance == "mahalanobis2":
-		d = numpy.array(values) - center_values
-		val = numpy.mean(d * d)
+	    elif distance == "jorg.individual":
+		val = min(values) - center_d
+	    elif distance == "mahalanobis-closest":
+		d = numpy.abs(numpy.array(values) - center_values)
+		# val = d # "mahalanobis-x"
+		val = numpy.min(d) # "mahalanobis-min"
+		# no std scaling "mahalanobis-nostd"
+		#val = numpy.mean(d * d) # mahalanobis2
 		var = numpy.var(center_values)
 		if var > 0:
-		    val /= var
+		#    val /= var
+		    val /= numpy.sqrt(var)
 		val = numpy.sqrt(val) 
-	    elif distance == "mahalanobis-kernel": 
-		values = numpy.array(values) - center_values
-		val = -numpy.log(numpy.sum([numpy.exp(-value-1) for value in values])) / len(values)
+	    elif distance == "mahalanobis-shortest":
+		d = numpy.abs(numpy.array(values) - center_values)
+		val = numpy.mean(d)
 		std = numpy.std(center_values)
 		if std > 0:
 		    val /= std
+	    elif distance == "mahalanobis-kernel":
+		values = numpy.abs(numpy.array(values) - center_values)
+		std = numpy.std(center_values)
+		if std > 0:
+		    values /= std
+		val = -numpy.log(numpy.mean([numpy.exp(-value) for value in values]))
 	    else:
 		raise ValueError("Unknown distance type " + distance)
 	source_to_target_distance[geneid] = val
+    if distance.startswith("mahalanobis"):
+	return source_to_target_distance, center_d
     return source_to_target_distance
 
-def get_source_to_average_target_overlap(network, geneids_source, geneids_target, distance="tom"):
+def get_source_to_average_target_overlap(network, geneids_source, geneids_target, distance):
     """
     Get TOM & MTOM
     """
@@ -337,7 +438,7 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 		    if network.has_edge(geneid_target1, geneid_target2):
 			count += 1
 	for geneid in geneids_source:
-	    divisor = 99999
+	    divisor = None
 	    genes = set(geneids_target)
 	    genes.add(geneid)
 	    for gene1 in genes:
@@ -347,7 +448,7 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 			continue
 		    neighbors = network.neighbors(gene2)
 		    common_neighbors &= set(neighbors)
-		if len(common_neighbors) < divisor:
+		if divisor is None or len(common_neighbors) < divisor:
 		    divisor = len(common_neighbors)
 	    common_neighbors = set(network.neighbors(geneid))
 	    for geneid_target in geneids_target:
@@ -373,7 +474,7 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 		if i < j:
 		    if network.has_edge(geneid1, geneid2):
 			count += 1
-	divisor = 99999
+	divisor = None 
 	common_neighbors = set()
 	for geneid1 in geneids:
 	    common_neighbors_inner = set()
@@ -385,7 +486,7 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 		    common_neighbors_inner = set(neighbors)
 		else:
 		    common_neighbors_inner &= set(neighbors)
-	    if len(common_neighbors_inner) < divisor:
+	    if divisor is None or len(common_neighbors_inner) < divisor:
 		divisor = len(common_neighbors_inner)
 	    neighbors = network.neighbors(geneid1)
 	    if len(common_neighbors) == 0:
@@ -402,69 +503,50 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 	raise ValueError("Unknown distance type " + distance)
     return source_to_target_distance
 
-def get_separation(network, sp, targets, seeds, distance):
+def get_separation(network, sp, targets, seeds, distance, averaging_function=lambda x: numpy.mean(x)): 
     """
+    Potential averaging functions
+    val = numpy.min(x) 
+    val = numpy.mean(x) 
+    val = -numpy.log(numpy.mean([numpy.exp(-value) for value in x]))
     jorg / mmtom / avg distances: knn-x, shortest, kernel, mahalanobis, tom, mtom, ... 
     """
     if distance.startswith("jorg-"):
 	distance = distance[len("jorg-"):] # closest was default before
 	target_to_distance = get_source_to_average_target_distance(sp, seeds, seeds, distance = distance, target_mean_and_std = None, exclude_self=True)
-	d1 = numpy.mean(target_to_distance.values())
-	target_to_distance = get_source_to_average_target_distance(sp, targets, targets, distance = distance, target_mean_and_std = None, exclude_self=True)
-	d2 = numpy.mean(target_to_distance.values())
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = distance, target_mean_and_std = None)
-	d12 = target_to_distance.values()
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = distance, target_mean_and_std = None)
-	d12.extend(target_to_distance.values())
-	d12 = numpy.mean(d12)
-	val = d12 - (d1 + d2) / 2.0
-    elif distance == "mahalanobis-jorg":
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis")
 	values = target_to_distance.values()
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis")
+	d1 = averaging_function(values)
+	target_to_distance = get_source_to_average_target_distance(sp, targets, targets, distance = distance, target_mean_and_std = None, exclude_self=True)
+	values = target_to_distance.values()
+	d2 = averaging_function(values)
+	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = distance, target_mean_and_std = None)
+	values = target_to_distance.values()
+	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = distance, target_mean_and_std = None)
 	values.extend(target_to_distance.values())
-	d12 = numpy.mean(values)
-	center, center_values = get_center_of_subnetwork(sp, seeds)
-	d1 = numpy.mean(center_values)
-	center, center_values = get_center_of_subnetwork(sp, targets)
-	d2 = numpy.mean(center_values)
+	d12 = averaging_function(values)
+	val = d12 - (d1 + d2) / 2.0
+    elif distance.startswith("mahalanobis-jorg-"):
+	distance = distance[len("mahalanobis-jorg-"):] # mahalanobis is default before
+	target_to_distance, d1 = get_source_to_average_target_distance(sp, targets, seeds, distance)
+	values = target_to_distance.values()
+	target_to_distance, d2 = get_source_to_average_target_distance(sp, seeds, targets, distance)
+	values.extend(target_to_distance.values())
+	d12 = averaging_function(values)
 	val = d12 - (d1 + d2) / 2.0
     elif distance == "mahalanobis-pairwise":
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis")
-	val = numpy.mean(target_to_distance.values())
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis")
-	val += numpy.mean(target_to_distance.values())
-	val /= 2
-    elif distance == "mahalanobis-pairwise-m":
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis")
+	target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis-shortest")
 	values = target_to_distance.values()
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis")
+	target_to_distance, center_d = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis-shortest")
 	values.extend(target_to_distance.values())
-	val = numpy.mean(values)
-    elif distance == "mahalanobis-pairwise-x":
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis-x")
-	values = []
-	for vals in target_to_distance.values():
-	    values.extend(vals.tolist())
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis-x")
-	for vals in target_to_distance.values():
-	    values.extend(vals.tolist())
-	val = numpy.mean(values)
-    elif distance == "mahalanobis-min-pairwise":
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis-min")
-	val = numpy.mean(target_to_distance.values())
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis-min")
-	val += numpy.mean(target_to_distance.values())
-	val /= 2
+	val = averaging_function(values)
     elif distance == "center-pairwise":
 	center_targets, center_values = get_center_of_subnetwork(sp, targets)
 	center_seeds, center_values = get_center_of_subnetwork(sp, seeds)
-	val = 0.0
+	values = []
 	for c_t in center_targets:
 	    for c_s in center_seeds:
-		val += sp[c_t][c_s]
-	val /= len(center_targets)*len(center_seeds)
-	#val = sp[center_targets][center_seeds]
+		values.append(sp[c_t][c_s])
+	val = averaging_function(values)
     elif distance == "closest-pairwise":
 	values = []
 	for geneid in targets:
@@ -487,7 +569,7 @@ def get_separation(network, sp, targets, seeds, distance):
 		    val = lengths[geneid_target]
 		inner_values.append(val)
 	    values.append(min(inner_values))
-	val = numpy.mean(values)
+	val = averaging_function(values)
     elif distance == "shortest-pairwise":
 	values = []
 	for geneid in targets:
@@ -498,7 +580,7 @@ def get_separation(network, sp, targets, seeds, distance):
 		else:
 		    val = lengths[geneid_seed]
 		values.append(val)
-	val = numpy.mean(values)
+	val = averaging_function(values)
     elif distance == "dsd-pairwise" or distance == "communicability-pairwise":
 	DSD, name_to_idx = sp
 	values = []
@@ -509,7 +591,10 @@ def get_separation(network, sp, targets, seeds, distance):
 		    val = 0
 		else:
 		    j = name_to_idx[geneid_seed]
-		    val = DSD[i, j]
+		    if distance.startswith("communicability"):
+			val = 1 - DSD[i, j]
+		    else:
+			val = DSD[i, j]
 		values.append(val)
 	for geneid in seeds:
 	    i = name_to_idx[geneid]
@@ -520,7 +605,7 @@ def get_separation(network, sp, targets, seeds, distance):
 		    j = name_to_idx[geneid_target]
 		    val = DSD[i, j]
 		values.append(val)
-	val = numpy.mean(values)
+	val = averaging_function(values)
     elif distance == "kernel-pairwise":
 	values = []
 	for geneid in targets:
@@ -533,14 +618,17 @@ def get_separation(network, sp, targets, seeds, distance):
 		values.append(val)
 	val = -numpy.log(numpy.sum([numpy.exp(-value-1) for value in values])) / len(values)
     else:
-	if distance.endswith("tom"):
+	if distance.endswith("tom") or distance.endswith("tom-min"):
 	    target_to_distance = get_source_to_average_target_overlap(network, targets, seeds, distance)
+	elif distance.startswith("mahalanobis"):
+	    target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance)
 	else:
 	    target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance)
 	values = target_to_distance.values()
-	val = numpy.mean(values) 
-	#val = numpy.min(values) 
-	#val = -numpy.log(numpy.sum([numpy.exp(-value) for value in values])) / len(values)
+	if distance.endswith("-min"):
+	    val = numpy.min(values)
+	else:
+	    val = averaging_function(values)
     return val
 
 def get_adjacency_matrix(G):
@@ -569,13 +657,14 @@ def get_communicability_distances(G, degree_scaling_function, dump_file):
     returns D distance matrix 
     """
     from scipy import linalg
+    #from scipy.sparse import linalg # need to update for expm 
     adjacency, idx_to_node = get_adjacency_matrix(G)
     n = numpy.size(adjacency[0])
     degree = numpy.zeros((n, 1))
     for i in xrange(0, n):
 	degree[i] = sum(adjacency[i])
     adjacency /= degree_scaling_function(degree)
-    D = linalg.expm2(adjacency)
+    D = linalg.expm(adjacency)
     return D, idx_to_node 
 
 
@@ -673,7 +762,7 @@ def convert_distance_matrix_to_dictionary(D, idx_to_node):
 
 def get_center_of_subnetwork(sp, nodes):
     center = None
-    center_d = 99999
+    center_d = None
     center_values = None
     for i, node1 in enumerate(nodes):
 	lengths = sp[node1]
@@ -684,15 +773,15 @@ def get_center_of_subnetwork(sp, nodes):
 	    else:
 		values.append(lengths[node2])
 	d = sum(values)
-	if d < center_d:
+	if center_d is None or d < center_d:
 	    center = [ node1 ]
 	    center_d = d
 	    #center_values = [ values ]
 	    center_values = numpy.array(values, dtype=float)
 	elif d == center_d:
 	    center.append(node1)
-	    #center_values.append(values)
 	    center_values += numpy.array(values)
+	    #center_values.append(values)
     center_values /= len(center)
     return center, center_values
 
@@ -1041,7 +1130,7 @@ def get_network_degree_histogram(g):
     return networkx.degree_histogram(g)
 
 
-def randomize_graph(graph, randomization_type, allow_self_edges = True):
+def randomize_graph(graph, randomization_type, allow_self_edges = False):
     """
     Creates a random network from given network as a networkx graph
     randomization_type: 
@@ -1058,6 +1147,24 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 
     n_node = graph.number_of_nodes()
     n_edge = graph.number_of_edges()
+
+    if randomization_type == "same_degree_sequence":
+	# Takes ages to find a suitable conformation for large graphs
+	sequence = graph.degree().values()
+	new_graph = None
+	while new_graph is None: 
+	    new_graph = networkx.random_degree_sequence_graph(sequence)
+	return new_graph
+
+    if randomization_type == "graph_tool_correlated":
+	try:
+	    import graph_tool
+	except:
+	    raise ValueError("Graph tool package not installed")
+	    return
+	new_graph = graph.copy()
+	graph_tool.generation.random_rewire(new_graph, model='uncorrelated', n_iter=1, edge_sweep=True, parallel_edges=False, self_loops=False, vertex_corr=None, block_membership=None, alias=True, cache_probs=True, persist=False, ret_fail=False, verbose=False)
+	return new_graph
 
     if randomization_type == "erdos_renyi":
 	#raise Exception("Work in progress")
@@ -1160,7 +1267,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
         random_nodes = graph.nodes()
         random.shuffle(random_nodes)
         equivalences = dict([(nodes[i],random_nodes[i]) for i in xrange(len(nodes))])
-        new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]],graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
+        new_graph.add_edges_from([ (equivalences[current_edge[0]], equivalences[current_edge[1]], graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
 
     elif randomization_type=="preserve_topology_and_node_degree": # shuffle_nodes_within_same_degree
         nodes_by_degree = dict( (degree,[]) for degree in graph.degree().values() )
@@ -1175,21 +1282,13 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
         new_graph.add_edges_from([ (equivalences[current_edge[0]],equivalences[current_edge[1]], graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
         
     elif randomization_type=="preserve_degree_distribution":
-        ## add edges as well
         for current_node1, current_node2 in graph.edges():
             new_graph.add_edge(current_node1, current_node2, graph.get_edge_data(current_node1, current_node2))
         max_degree = sorted(graph.degree().values())[-1]
-        #nodes_by_degree = dict( (degree,{}) for degree in graph.degree().values() )
-        nodes_by_degree = dict( (degree,{}) for degree in xrange(max_degree+1) )
+        nodes_by_degree = dict( (degree, {}) for degree in xrange(max_degree+1) )
         graph_degree = graph.degree()
         [ nodes_by_degree[graph_degree[node]].setdefault(node) for node in graph_degree ]
-        #print new_graph.nodes(), new_graph.edges()
-        #print nodes_by_degree
-        #if n_edge < MIN_NUMBER_OF_PERTURBATION:
-        #    n_perturbation = random.randint(n_edge/2, n_edge)
-        #else:
-        #    n_perturbation = random.randint(MIN_NUMBER_OF_PERTURBATION, n_edge)
-        n_perturbation = random.randint(n_edge/2, n_edge)
+        n_perturbation = random.randint(2*n_edge/3, n_edge) # Perturb at least 66% of the edges
         for i in xrange(n_perturbation):
             n_trial = 0
             while True:
@@ -1207,33 +1306,41 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
                 target_degree = new_graph.degree(target_id)
                 del nodes_by_degree[source_degree][source_id] 
                 nodes_by_degree[source_degree-1].setdefault(source_id)
+		if target_id == source_id:
+		    target_degree -= 1
                 del nodes_by_degree[target_degree][target_id] 
                 nodes_by_degree[target_degree-1].setdefault(target_id)
                 ## not very important to check for cases where new_source = source (v.v. for targets) 
-                new_source_id = random.choice(nodes_by_degree[source_degree-1].keys())
                 new_target_id = random.choice(nodes_by_degree[target_degree-1].keys())
+		if source_id == target_id:
+		    new_source_id = new_target_id
+		else:
+		    new_source_id = random.choice(nodes_by_degree[source_degree-1].keys())
 		if debug:
 		    print source_id, target_id, " / ", new_source_id, new_target_id
+		    print source_degree, target_degree
                 ## check if going to add an existing edge or self edge
-                if new_graph.has_edge(new_source_id, new_target_id) or new_source_id == new_target_id:
-                    del nodes_by_degree[source_degree-1][source_id] 
-                    nodes_by_degree[source_degree].setdefault(source_id)
+                if new_graph.has_edge(new_source_id, new_target_id) or (not allow_self_edges and new_source_id == new_target_id):
                     del nodes_by_degree[target_degree-1][target_id] 
                     nodes_by_degree[target_degree].setdefault(target_id)
+                    del nodes_by_degree[source_degree-1][source_id] 
+                    nodes_by_degree[source_degree].setdefault(source_id)
                     continue
 		if debug:
-		    print "rm %d %d" % (source_id, target_id)
+		    print "rm %s %s" % (source_id, target_id)
                 edge_data = new_graph.get_edge_data(source_id, target_id)
-                new_graph.delete_edge(source_id, target_id)
+                new_graph.remove_edge(source_id, target_id)
 		if debug:
-		    print "add %d %d" % (new_source_id, new_target_id)
+		    print "add %s %s" % (new_source_id, new_target_id)
                 new_graph.add_edge(new_source_id, new_target_id, edge_data)
-                del nodes_by_degree[source_degree-1][new_source_id] 
-                nodes_by_degree[source_degree].setdefault(new_source_id)
                 del nodes_by_degree[target_degree-1][new_target_id] 
                 nodes_by_degree[target_degree].setdefault(new_target_id)
+		if new_source_id == new_target_id and source_id != target_id:
+		    source_degree += 1
+                del nodes_by_degree[source_degree-1][new_source_id] 
+                nodes_by_degree[source_degree].setdefault(new_source_id)
                 break
-        #self.randomize_graph(new_graph, "preserve_topology")
+        randomize_graph(new_graph, "preserve_topology")
 
     elif randomization_type=="preserve_degree_distribution_and_node_degree":
         ## add edges as well
@@ -1318,8 +1425,8 @@ def randomize_graph(graph, randomization_type, allow_self_edges = True):
 		    print "rm %d %d" % (new_source_id, new_target_id)
                 edge_data_1 = new_graph.get_edge_data(source_id, target_id)
                 edge_data_2 = new_graph.get_edge_data(new_source_id, new_target_id)
-                new_graph.delete_edge(source_id, target_id)
-                new_graph.delete_edge(new_source_id, new_target_id)
+                new_graph.remove_edge(source_id, target_id)
+                new_graph.remove_edge(new_source_id, new_target_id)
 		if debug:
 		    print "add %d %d" % (source_id, new_target_id)
 		    print "add %d %d" % (new_source_id, target_id)
