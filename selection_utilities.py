@@ -1,9 +1,10 @@
+from random import shuffle
+from itertools import combinations
 
 def main():
     return
 
 def get_subsamples(scores, n_fold=10000, n_sample=1000):
-    from random import shuffle
     for i in xrange(n_fold):
 	#if with_replacement:
 	#	size = len(scores)-1
@@ -14,6 +15,18 @@ def get_subsamples(scores, n_fold=10000, n_sample=1000):
 	selected = scores[:n_sample]
 	yield selected
     return
+
+
+def random_combination(nodes, n, r):
+    "Random selection r times from itertools.combinations(nodes, n)"
+    shuffle(nodes)
+    values = []
+    for i, combination in enumerate(combinations(nodes, n)):
+	if i >= r:
+	    break
+	values.append(combination)
+    return values
+
 
 def k_fold_cross_validation(X, K, randomize = False, replicable = None):
     """
@@ -30,7 +43,7 @@ def k_fold_cross_validation(X, K, randomize = False, replicable = None):
     """
     #if randomize: from random import shuffle; X=list(X); shuffle(X)
     if randomize: 
-	from random import shuffle, seed
+	from random import seed
 	X=list(X)
 	if replicable is not None: 
 	    seed(replicable)
@@ -47,7 +60,7 @@ def generate_samples_from_list_without_replacement(elements, sample_size, n_fold
 	n_folds: If None calculated to cover as much elements as possible
 	replicable: If not None uses this replicable as the seed for random
     """
-    from random import shuffle, seed
+    from random import seed
     if replicable is not None:
 	seed(replicable)
     shuffle(elements)

@@ -6,8 +6,14 @@
 
 #from xml.etree.ElementTree import ElementTree
 from xml.etree.ElementTree import iterparse
+import TsvReader
 
 def main():
+    file_name = "../data/disease/uniprot/humdisease.txt"
+    mim_to_mesh_values = get_mim_to_mesh(file_name)
+    print len(mim_to_mesh)
+    print mim_to_mesh["600807"]
+    return
     from time import clock
     parser = UniprotXMLParser("../data/Q12888.xml")
     #parser = UniprotXMLParser("../../data/phosphorylation/uniprot/uniprot-phosphorylation-large-scale-analysis.xml")
@@ -20,6 +26,53 @@ def main():
     print len(elements), elements[-1]
     print t2-t1 
     return
+
+
+def get_uniprot_to_geneid(file_name, uniprot_ids=None):
+    """
+    To parse idmapping.tab from Uniprot 
+    """
+    parser = TsvReader.TsvReader(uniprot_file, delim="\t", inner_delim=";")
+    column_to_index, id_to_values = parser.read(fields_to_include=["UniProtKB-AC", "GeneID (EntrezGene)"], keys_to_include=uniprot_ids, merge_inner_values=True)
+    uniprot_to_geneid = {}
+    for uniprot, values in id_to_values.iteritems():
+    	for val in values:
+    	    geneid = val[column_to_index["geneid (entrezgene)"]]
+	    #if uniprot in uniprot_to_geneid:
+	    #	print "multiple gene id", uniprot
+	    #uniprot_to_geneid.setdefault(uniprot, set()).add(geneid)
+	    uniprot_to_geneid[uniprot] = geneid
+    return uniprot_to_geneid
+
+
+def get_mim_to_mesh(file_name):
+    """
+    To parse humdisease.txt from Uniprot
+    """
+    mim_to_mesh_values = {}
+    f = open(file_name)
+    line = f.readline()
+    while not line.startswith("ID"):
+	line = f.readline()
+    words = line.strip().split()
+    disease = " ".join(words[1:]).rstrip(".")
+    for line in f:
+	words = line.strip().split()
+	if words[0] == "ID":
+	    disease = " ".join(words[1:]).rstrip(".")
+	if words[0] == "DR":
+	    id_type = words[1].lower().rstrip(";")
+	    if id_type == "mesh":
+		mesh = words[2].rstrip(".")
+	    elif id_type == "mim":
+		mim = words[2].rstrip(";")
+	if line.startswith("//"):
+	    #if mim in mim_to_mesh_values and mim_to_mesh_values[mim][1] == mesh:
+		#continue
+	    #if mim in mim_to_mesh_values: print mim, mim_to_mesh_values[mim], disease, mesh
+	    mim_to_mesh_values.setdefault(mim, []).append((disease, mesh))
+    f.close()
+    return mim_to_mesh_values
 
 class UniprotXMLParser(object):
     NS="{http://uniprot.org/uniprot}"

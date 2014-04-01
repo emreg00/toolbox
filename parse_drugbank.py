@@ -242,23 +242,7 @@ def get_disease_specific_drugs(parser, phenotypes):
 	for disease in phenotypes:
 	    #if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
 	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
-	    disease_mod = disease.replace(" and ", ", ")
-	    phrases = disease_mod.split(",")
-	    values = []
-	    for phrase in phrases:
-		inner_values = []
-		words = phrase.strip().split()
-		for i, token in enumerate(words):
-		    if token.endswith("'s"):
-			token = token[:-2]
-		    if i == len(words) - 1:
-			if token[-1] == "s":
-			    token = token[:-1]
-		    if token in ("disease", "disorder", "syndrome"):
-			continue
-		    inner_values.append(token)
-		#if len(inner_values) > 0:
-		values.append(" ".join(inner_values))
+	    values = tokenize_disease_name(disease)
 	    #print disease, values
 	    if all([ indication.find(word.strip()) != -1 for word in values ]):
 		#print disease, drug
@@ -276,6 +260,26 @@ def get_disease_specific_drugs(parser, phenotypes):
 	    print diseases, indication.encode('ascii','ignore')
     #print disease_to_drugs["diabetes mellitus, type 2"] 
     return disease_to_drugs
+
+
+def tokenize_disease_name(disease):
+    disease_mod = disease.replace(" and ", ", ")
+    phrases = disease_mod.split(",")
+    values = []
+    for phrase in phrases:
+	inner_values = []
+	words = phrase.strip().split()
+	for i, token in enumerate(words):
+	    if token.endswith("'s"):
+		token = token[:-2]
+	    if i == len(words) - 1:
+		if token[-1] == "s":
+		    token = token[:-1]
+	    if token in ("disease", "disorder", "syndrome"):
+		continue
+	    inner_values.append(token)
+	values.append(" ".join(inner_values))
+    return values
 
 
 def get_drug_targets(file_name, drugs_file=None):

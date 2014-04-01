@@ -1,20 +1,41 @@
 
-from biana.utilities import TsvReader
+import TsvReader
 import re, os
 
-#diseases = ["alzheimer", "breast cancer", "diabetes", "insulin", "anemia", "aneurysm", "myopathy", "neuropathy", "obesity", "parkinson disease", "prostate cancer", "hypertension", "leukemia", "lung cancer", "autism", "asthma", "ataxia", "epilepsy", "schizophrenia", "cardiomyopathy", "cataract", "spastic paraplegia", "lymphoma", "mental retardation", "systemic lupus erythematosus"]
-
-dir_name = "../data/"
-uniprot_dir_name = "uniprot_2011_Nov_2"
 
 def main():
-    #merge_uniprot_chromosome_files()
-    #disease_to_genes, disease_to_loci = get_disease_gene_mapping()
-    #get_candidates_by_loci_matching(disease_to_genes, disease_to_loci)
+    dir_name = "../data/"
+    uniprot_dir_name = "uniprot_2011_Nov_2"
+    mim_to_traits = get_mim_to_traits(dir_name + "disease/omim/morbidmap")
+    print len(mim_to_traits)
+    print mim_to_traits["600807"]
+    #merge_uniprot_chromosome_files(uniprot_dir_name)
+    #disease_to_genes, disease_to_loci = get_disease_gene_mapping(dir_name)
+    #get_candidates_by_loci_matching(disease_to_genes, disease_to_loci, dir_name, uniprot_dir_name)
     #get_all_genes_in_morbidmap("diabetes_type_2_morbidmap.txt", "diabetes_type_2_genes.txt")
     #check_all_loci_in_morbidmap(dir_name + os.sep + "morbidmap")
     #get_disease_similarity_matrix(dir_name, dir_name + "similarity.dat")
     return
+
+def get_mim_to_traits(file_name):
+    mim_to_traits = {}
+    trait_exp = re.compile("(.*), (\d{6})")
+    f = open(file_name)
+    for line in f:
+	words = line.strip().split("|")
+	#if words[0][0] == "?":
+	#    continue
+	m = trait_exp.match(words[0])
+	if m:
+	    mim = m.group(2)
+	    trait = m.group(1).strip("{}")
+	    print mim, trait
+	else:
+	    continue
+	mim_to_traits.setdefault(mim, []).append(trait)
+    f.close()
+    return mim_to_traits
+
 
 def get_disease_genes(base_dir, genes_to_be_considered=None, top_percentage=None):
     disease_to_genes = {}
@@ -88,7 +109,7 @@ def get_all_genes_in_morbidmap(file_name, out_file_name):
     f.close()
     return
 
-def merge_uniprot_chromosome_files():
+def merge_uniprot_chromosome_files(uniprot_dir_name):
     f_merged = open(uniprot_dir_name + os.sep + "uniprot_loci.txt", 'w')
     for file_name in sorted(os.listdir(uniprot_dir_name)):
 	f = open(uniprot_dir_name + os.sep + file_name)
@@ -112,7 +133,7 @@ def merge_uniprot_chromosome_files():
     return
 
 
-def get_disease_gene_mapping():
+def get_disease_gene_mapping(dir_name):
 
     network_genes = set([ line.strip() for line in open("bppi_all.txt") ])
     network_genes &= set([ line.strip() for line in open("entrez_all.txt") ])
@@ -339,7 +360,7 @@ def check_loci_consistency(loci, uniprot_loci):
 		    inside = True
     return inside
 
-def get_candidates_by_loci_matching(disease_to_genes, disease_to_loci, via="biomart"):
+def get_candidates_by_loci_matching(disease_to_genes, disease_to_loci, dir_name, uniprot_dir_name, via="biomart"):
 
     temp_file = ".biomart_results.txt"
 

@@ -20,7 +20,7 @@ class UMLS(object):
 	self.concept_id_to_relations = None
 	return
 
-    def get_concept_info(self, concept_types=None):
+    def get_concept_info(self, concept_types=None, concept_sources=None):
 	if self.concept_id_to_values is not None and self.concept_to_concept_id is not None:
 	    return self.concept_id_to_values, self.concept_to_concept_id
 	self.concept_id_to_values = {}
@@ -37,12 +37,14 @@ class UMLS(object):
 	    #	print words[col_to_idx["ts"]], words[col_to_idx["ispref"]], words[col_to_idx["tty"]]
 	    if words[col_to_idx["lat"]] != "ENG" or words[col_to_idx["ispref"]] != "Y": # words[col_to_idx["ts"]] != "P" 
 		continue
-	    if concept_types is not None and words[col_to_idx["tty"]] not in concept_types: 
+	    concept_type = words[col_to_idx["tty"]]
+	    if concept_types is not None and concept_type not in concept_types: 
+		continue
+	    source = words[col_to_idx["sab"]]
+	    if concept_sources is not None and source not in concept_sources: 
 		continue
 	    concept = words[col_to_idx["str"]]
-	    source = words[col_to_idx["sab"]]
 	    source_id = words[col_to_idx["code"]]
-	    concept_type = words[col_to_idx["tty"]]
 	    d = self.concept_id_to_values.setdefault(concept_id, {})
 	    d.setdefault(source, set()).add((concept, source_id, concept_type))
 	    if concept_id in self.concept_to_concept_id:
@@ -135,6 +137,15 @@ class UMLS(object):
 			    drug_to_diseases.setdefault(concept, set()).add(concept2)
 	return drug_to_diseases
 
+
+def get_mesh_id_to_name(desc_file):
+    u = UMLS(desc_file, None)
+    concept_id_to_values, concept_to_concept_id = u.get_concept_info(concept_types = set(["MH"]), concept_sources = set(["MSH"]))
+    source_id_to_concept = {}
+    for concept_id, values in concept_id_to_values.iteritems():
+    	for concept, source_id, concept_type in values["MSH"]:
+	    source_id_to_concept[source_id] = concept
+    return source_id_to_concept
 
 def get_basic_info(desc_file, rel_file):
     u = UMLS(desc_file, rel_file)

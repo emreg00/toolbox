@@ -4,7 +4,7 @@ class FormattedFileProcessor(object):
 	Wrapper around reading/processing various formatted input streams
     """
     allowed_formats = set(["sif", "fasta", "tsv"])
-    def __init__(self, input_file_name, input_type, delim, inner_delim=None):
+    def __init__(self, input_file_name, input_type, delim, inner_delim=None, quotation = None):
 	"""
 	    Initialize an object of this class storing 
 	    input_file_name: file name to be read/processed
@@ -14,6 +14,7 @@ class FormattedFileProcessor(object):
 	self.input_type = input_type
 	self.delim = delim
 	self.inner_delim = inner_delim
+	self.quotation = quotation
 	if not self.input_type in self.allowed_formats:
 	    raise Exception("Unrecognized input type")
 	return

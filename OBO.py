@@ -24,6 +24,22 @@ class OBO(object):
     def get_term_relation_dict(self, v):
 	return self.g[v]
 
+    def get_xref_mapping(self, left_id, right_id):
+	left_id_to_right_ids = {}
+	for node, data in self.g.nodes(data=True):
+	    left_vals = []
+	    right_vals = []
+	    for xref in data["xref"]:
+		id_type, id_val = xref.split(":")
+		id_type = id_type.lower()
+		if id_type == left_id:
+		    left_vals.append(id_val)
+		if id_type == right_id:
+		    right_vals.append(id_val)
+	    for left_val in left_vals:
+		left_id_to_right_ids[left_val] = right_vals
+	return left_id_to_right_ids
+
     def get_descendants(self, id):
 	"""
 	Gets all the descendants

@@ -785,6 +785,7 @@ def get_center_of_subnetwork(sp, nodes):
     center_values /= len(center)
     return center, center_values
 
+
 def get_degree_binning(g, bin_size):
     degree_to_nodes = {}
     for node, degree in g.degree().iteritems():
@@ -813,6 +814,7 @@ def get_degree_binning(g, bin_size):
 	    bins.append((low, high, val))
     return bins
 
+
 def get_degree_equivalents(seeds, bins, g):
     seed_to_nodes = {}
     for seed in seeds:
@@ -824,6 +826,25 @@ def get_degree_equivalents(seeds, bins, g):
 		seed_to_nodes[seed] = mod_nodes
 		break
     return seed_to_nodes
+
+
+def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random, degree_aware=True):
+    """
+    Use get_degree_binning to get bins
+    """
+    values = []
+    nodes = network.nodes()
+    for i in xrange(n_random):
+	if degree_aware:
+	    nodes_random = []
+	    node_to_equivalent_nodes = get_degree_equivalents(nodes_selected, bins, network)
+	    for node, equivalent_nodes in node_to_equivalent_nodes.iteritems():
+		nodes_random.append(random.choice(equivalent_nodes))
+	else:
+	    nodes_random = random.sample(nodes, len(nodes_selected))
+	values.append(nodes_random)
+    return values
+
 
 def get_pairwise_distances_between_nodes(g, sources, targets=None):
     symetric = False

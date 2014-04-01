@@ -1,3 +1,8 @@
+###############################################################################
+# To parse OBO formatted files
+#
+# Initial code contributed by Anand Patel from UCSD
+###############################################################################
 
 import networkx as nx
 import re
@@ -24,7 +29,14 @@ class Relationship:
 	elif tag_line.startswith("subset"):
 	    self.type = "subset"
 	    self.subset = tag_line.split(' ')[1]
+	elif tag_line.startswith("is_obsolete"):
+	    self.type = "obsolete"
+	    self.subset = tag_line.split(' ')[1]
         elif tag_line.startswith('alt_id'):
+            parts = tag_line.split(' ')
+	    self.type = parts[0].rstrip(':')
+            self.id = parts[1]
+        elif tag_line.startswith('xref'):
             parts = tag_line.split(' ')
 	    self.type = parts[0].rstrip(':')
             self.id = parts[1]
@@ -50,15 +62,18 @@ def getOboGraph(fname, save_synonyms = False):
             # Expect Name in the next line
             name = obo_file.next().strip()[6:]
             obo.add_node(id)
-	    # Expect Namespace in the next line
-            namespace = obo_file.next().strip()[11:]
-            # Legible Name
             obo.node[id]['n'] = name
-            obo.node[id]['t'] = namespace
+	    line = obo_file.next().strip()
+	    if line.startswith("namespace"):
+		# Expect Namespace in the next line
+		namespace = line[11:]
+		obo.node[id]['t'] = namespace
             # Alternative ids 
-            obo.node[id]['x'] = []
+            obo.node[id]['alt_id'] = []
+            # Cross references
+            obo.node[id]['xref'] = []
             # Genes
-            obo.node[id]['g'] = []
+            obo.node[id]['genes'] = []
             
             while True:
                 stanza = obo_file.next().strip()
@@ -68,23 +83,22 @@ def getOboGraph(fname, save_synonyms = False):
                 stanza = Relationship(stanza, save_synonyms)
 		if stanza.type == "ignore":
 		    continue
-		if stanza.type == "subset":
+		elif stanza.type == "subset":
 		    if stanza.subset == "goslim_yeast":
 			obo.node[id]['y'] = True
 		    if stanza.subset.startswith("goslim"):
 			obo.node[id]['a'] = True
-		    continue
+		elif stanza.type == "obsolete":
+			obo.node[id]['o'] = True
 		# Synonyms 
-		if save_synonyms and stanza.type == "synonym":
+		elif save_synonyms and stanza.type == "synonym":
 		    obo.node[id].setdefault('s', set()).add(stanza.id)
 		    #obo.node[id]['s'].add(stanza.id)
-		    continue
-		if stanza.type == "alt_id":
-		    obo.node[id]['x'].append(stanza.id)
-		    continue
-		#if stanza.type in ("is_a", "relationship"): 
-		obo.add_edge(id, stanza.id)
-		obo[id][stanza.id]['r'] = stanza.type
+		elif stanza.type in ("alt_id", "xref"):
+		    obo.node[id][stanza.type].append(stanza.id)
+		elif stanza.type in ("is_a", "relationship"): 
+		    obo.add_edge(id, stanza.id)
+		    obo[id][stanza.id]['r'] = stanza.type
     
     return obo
 

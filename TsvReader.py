@@ -5,8 +5,8 @@ class TsvReader(FormattedFileProcessor):
     """
 	Read/process TSV (tab seperated) formatted files
     """
-    def __init__(self, input_file_name, delim="\t", inner_delim=None):
-	FormattedFileProcessor.__init__(self, input_file_name=input_file_name, input_type="tsv", delim = delim, inner_delim = inner_delim)
+    def __init__(self, input_file_name, delim="\t", inner_delim=None, quotation=None):
+	FormattedFileProcessor.__init__(self, input_file_name=input_file_name, input_type="tsv", delim = delim, inner_delim = inner_delim, quotation = quotation)
 	return
 
     def read(self, fields_to_include, keys_to_include=None, merge_inner_values=False):
@@ -38,7 +38,7 @@ class TsvReader(FormattedFileProcessor):
 	file = open(self.input_file_name)
 	# Read header
 	line = file.readline()
-	cols = [ c.lower() for c in line.strip("\n").split(self.delim) ]
+	cols = [ c.lower().strip(self.quotation) for c in line.strip("\n").split(self.delim) ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	    fields_to_include = []
@@ -62,15 +62,15 @@ class TsvReader(FormattedFileProcessor):
 	while line:
 	    try:
 		vals = line.rstrip("\n").split(self.delim)
-		id = vals[columns[first_column]]
-		if keys_to_include is None or id in keys_to_include:
+		id_ = vals[columns[first_column]].strip(self.quotation)
+		if keys_to_include is None or id_ in keys_to_include:
 		    new_vals = []
 		    if merge_inner_values:
 			for f in fields_to_include:
-			    new_vals.extend(map(lambda x: x.strip(), vals[columns[f]].split(self.inner_delim)))
+			    new_vals.extend(map(lambda x: x.strip().strip(self.quotation), vals[columns[f]].split(self.inner_delim)))
 		    else:
-			new_vals = [vals[columns[f]] for f in fields_to_include]
-		    id_to_values.setdefault(id, []).append(new_vals)
+			new_vals = [vals[columns[f]].strip(self.quotation) for f in fields_to_include]
+		    id_to_values.setdefault(id_, []).append(new_vals)
 	    except:  
 		print line_prev, line 
 		import traceback
@@ -114,19 +114,19 @@ class TsvReader(FormattedFileProcessor):
 	while line:
 	    try:
 		vals = line.strip("\n").split('\t')
-		id = vals[columns[first_column]]
-		if keys_to_include is None or id in keys_to_include:
+		id_ = vals[columns[first_column]]
+		if keys_to_include is None or id_ in keys_to_include:
 		    if out_method is None:
 			if fields_to_include is None:
 			    if overwrite_keys:
-				id_to_value[id] = vals
+				id_to_value[id_] = vals
 			    else:
-				id_to_value.setdefault(id, []).append(vals)
+				id_to_value.setdefault(id_, []).append(vals)
 			else:
 			    if overwrite_keys:
-				id_to_value[id] = [ vals[columns[f]] for f in fields_to_include]
+				id_to_value[id_] = [ vals[columns[f]] for f in fields_to_include]
 			    else:
-				id_to_value.setdefault(id, []).append( [vals[columns[f]] for f in fields_to_include] )
+				id_to_value.setdefault(id_, []).append( [vals[columns[f]] for f in fields_to_include] )
 		    else:
 			out_method("%s\n" % "\t".join([ vals[columns[f]] for f in fields_to_include ]))
 	    except: #Exception, e: 
