@@ -160,6 +160,43 @@ class DrugBankXMLParser(object):
 	return name_to_drug, synonym_to_drug
 
 
+def get_disease_specific_drugs(parser, phenotypes):
+    import text_utilities
+    disease_to_drugs = {}
+    indication_to_diseases = {}
+    for drug, indication in parser.drug_to_indication.iteritems():
+	if indication is None:
+	    continue
+	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
+	    #disease = keywords[0]
+	    #disease_to_drugs.setdefault(disease, set()).add(drug)
+	#for disease, exp in zip(phenotypes, exps):
+	#    if exp.search(indication.lower()) is not None:
+	#	disease_to_drugs.setdefault(disease, set()).add(drug)
+	indication = indication.lower()
+	for disease in phenotypes:
+	    #if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
+	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
+	    values = text_utilities.tokenize_disease_name(disease)
+	    #print disease, values
+	    if all([ indication.find(word.strip()) != -1 for word in values ]):
+		#print disease, drug
+		disease_to_drugs.setdefault(disease, set()).add(drug)
+		indication_to_diseases.setdefault(indication, set()).add(disease)
+	    else:
+		indication_to_diseases.setdefault(indication, set())
+    # Print non-matching indications #!
+    for indication, diseases in indication_to_diseases.iteritems():
+	if len(diseases) == 0:
+	    continue
+	    print indication.encode('ascii','ignore')
+	elif indication.find(" not ") != -1 or indication.find(" except ") != -1:
+	    continue
+	    print diseases, indication.encode('ascii','ignore')
+    #print disease_to_drugs["diabetes mellitus, type 2"] 
+    return disease_to_drugs
+
+
 def get_drugs_for_targets(file_name, output_file):
     parser = DrugBankXMLParser(file_name)
     parser.parse()
@@ -221,65 +258,6 @@ def get_drug_info(drug_info_file):
         words = line.strip("\n").split("\t")
         drug_to_values[words[0]] = words[1:]
     return col_to_idx, drug_to_values
-
-def get_disease_specific_drugs(parser, phenotypes):
-    import re
-    #keywords = ["cancer", "neoplasm", "leukemia", "lymphoma", "carcinoma", "melanoma"]
-    #exps = [ re.compile(keyword) for keyword in keywords ]
-    #exps = [ re.compile(keyword.lower()) for keyword in phenotypes ]
-    disease_to_drugs = {}
-    indication_to_diseases = {}
-    for drug, indication in parser.drug_to_indication.iteritems():
-	if indication is None:
-	    continue
-	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
-	    #disease = keywords[0]
-	    #disease_to_drugs.setdefault(disease, set()).add(drug)
-	#for disease, exp in zip(phenotypes, exps):
-	#    if exp.search(indication.lower()) is not None:
-	#	disease_to_drugs.setdefault(disease, set()).add(drug)
-	indication = indication.lower()
-	for disease in phenotypes:
-	    #if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
-	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
-	    values = tokenize_disease_name(disease)
-	    #print disease, values
-	    if all([ indication.find(word.strip()) != -1 for word in values ]):
-		#print disease, drug
-		disease_to_drugs.setdefault(disease, set()).add(drug)
-		indication_to_diseases.setdefault(indication, set()).add(disease)
-	    else:
-		indication_to_diseases.setdefault(indication, set())
-    # Print non-matching indications #!
-    for indication, diseases in indication_to_diseases.iteritems():
-	if len(diseases) == 0:
-	    continue
-	    print indication.encode('ascii','ignore')
-	elif indication.find(" not ") != -1 or indication.find(" except ") != -1:
-	    continue
-	    print diseases, indication.encode('ascii','ignore')
-    #print disease_to_drugs["diabetes mellitus, type 2"] 
-    return disease_to_drugs
-
-
-def tokenize_disease_name(disease):
-    disease_mod = disease.replace(" and ", ", ")
-    phrases = disease_mod.split(",")
-    values = []
-    for phrase in phrases:
-	inner_values = []
-	words = phrase.strip().split()
-	for i, token in enumerate(words):
-	    if token.endswith("'s"):
-		token = token[:-2]
-	    if i == len(words) - 1:
-		if token[-1] == "s":
-		    token = token[:-1]
-	    if token in ("disease", "disorder", "syndrome"):
-		continue
-	    inner_values.append(token)
-	values.append(" ".join(inner_values))
-    return values
 
 
 def get_drug_targets(file_name, drugs_file=None):

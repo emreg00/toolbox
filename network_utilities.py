@@ -59,8 +59,19 @@ def create_graph_with_same_type(G):
     return create_empty_copy(G)
 
 def create_random_graphs(G, n_random, randomization_type, allow_self_edges, out_prefix):
+    """
+    randomization_type either preserve degree / topology / random
+    or prune_k% / permute_k%
+    """
     for i in xrange(n_random):
-	g = randomize_graph(G, randomization_type, allow_self_edges)
+	if randomization_type.startswith("prune_"):
+	    percentage = int(randomization_type.split("_")[1])
+	    g = prune_graph_at_given_percentage(G, percentage)
+	elif randomization_type.startswith("permute_"):
+	    percentage = int(randomization_type.split("_")[1])
+	    g = permute_graph_at_given_percentage(G, percentage, allow_self_edges = allow_self_edges)
+	else:
+	    g = randomize_graph(G, randomization_type, allow_self_edges)
 	dump_file = "%s_%d.pcl" % (out_prefix, i)
 	cPickle.dump(g, open(dump_file, 'w'))
 	dump_file = "%s_sp_%d.pcl" % (out_prefix, i)
@@ -145,6 +156,9 @@ def get_shortest_path_lengths(G, dump_file):
 def get_shortest_path_between(G, source_id, target_id):
     return networkx.shortest_path(G, source_id, target_id)
 
+def get_shortest_path_length_between(G, source_id, target_id):
+    return networkx.shortest_path_length(G, source_id, target_id)
+
 def get_all_shortest_paths_between(G, source_id, target_id):
     return networkx.all_shortest_paths(G, source_id, target_id)
 
@@ -153,6 +167,9 @@ def get_all_paths_from(G, source_id):
         get all paths from source node to all possible nodes in a dictionary
     """
     return networkx.single_source_dijkstra_path(G, source_id)
+
+def get_all_paths_between(G, source_id, target_id, cutoff=None): 
+    return networkx.all_simple_paths(G, source_id, target_id, cutoff)
 
 @dumper
 def get_node_betweenness(G, dump_file):
@@ -341,7 +358,7 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 			val = val / s  
 		else:
 		    if geneid_target not in lengths:
-			print "Warning: node not connected", geneid_target
+			#print "Warning: node not connected", geneid_target
 			val = 999
 		    else:
 			val = lengths[geneid_target]

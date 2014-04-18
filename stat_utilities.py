@@ -104,10 +104,14 @@ def hypergeometric_test(picked_good, picked_all, all_all, all_good):
     val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
     return val
 
-def density_estimation(self, occurences, possible_values):
+def density_estimation(occurences, possible_values):
     kde = stats.gaussian_kde(map(float, occurences))
     p = kde(possible_values)
     return p / sum(p)
+
+def fisher_exact(tp, fp, fn, tn, alternative="two-sided"):
+    oddsratio, pvalue = stats.fisher_exact([[tp, fp], [fn, tn]], alternative)
+    return oddsratio, pvalue
 
 if __name__ == "__main__":
     main()

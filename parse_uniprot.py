@@ -32,7 +32,7 @@ def get_uniprot_to_geneid(file_name, uniprot_ids=None):
     """
     To parse idmapping.tab from Uniprot 
     """
-    parser = TsvReader.TsvReader(uniprot_file, delim="\t", inner_delim=";")
+    parser = TsvReader.TsvReader(file_name, delim="\t", inner_delim=";")
     column_to_index, id_to_values = parser.read(fields_to_include=["UniProtKB-AC", "GeneID (EntrezGene)"], keys_to_include=uniprot_ids, merge_inner_values=True)
     uniprot_to_geneid = {}
     for uniprot, values in id_to_values.iteritems():
