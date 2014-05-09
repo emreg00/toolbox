@@ -33,8 +33,10 @@ class DrugBankXMLParser(object):
 	self.drug_to_indication = {}
 	self.drug_to_interactions = {}
 	self.drug_to_partner_ids = {}
+	self.drug_to_partner_ids_active = {}
 	self.drug_to_pubchem = {}
 	self.drug_to_targets = {}
+	self.drug_to_targets_active = {}
 	self.partner_id_to_gene = {}
 	self.partner_id_to_uniprot = {}
 	return
@@ -60,8 +62,11 @@ class DrugBankXMLParser(object):
 		if elem.tag == self.NS+"partner":
 		    if state_stack[-2] == self.NS+"partners":
 			partner_id = elem.attrib["id"]
-		if elem.tag == self.NS+"resource":
+		elif elem.tag == self.NS+"resource":
 		    uniprot_resource = False
+		elif elem.tag == self.NS+"target":
+		    if state_stack[-2] == self.NS+"targets":
+			current_target = elem.attrib["partner"]
 	    if event == "end":
 		if elem.tag == self.NS+"name":
 		    if state_stack[-2] == self.NS+"drug":
@@ -103,7 +108,12 @@ class DrugBankXMLParser(object):
 			self.drug_to_indication[drug_id] = elem.text
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
-			self.drug_to_partner_ids.setdefault(drug_id, []).append(elem.attrib["partner"])
+			#current_target = elem.attrib["partner"]
+			self.drug_to_partner_ids.setdefault(drug_id, []).append(current_target)
+		elif elem.tag == self.NS+"known-action":
+		    if state_stack[-2] == self.NS+"target":
+			if elem.text == "yes":
+			    self.drug_to_partner_ids_active.setdefault(drug_id, set()).add(current_target)
 		elif elem.tag == self.NS+"group":
 		    if state_stack[-2] == self.NS+"groups":
 			self.drug_to_groups.setdefault(drug_id, set()).add(elem.text)
@@ -138,6 +148,8 @@ class DrugBankXMLParser(object):
                     # drug target has no uniprot
                     continue
                 self.drug_to_targets.setdefault(drug, set()).add(uniprot)
+		if drug in self.drug_to_partner_ids_active and partner_id in self.drug_to_partner_ids_active[drug]:
+		    self.drug_to_targets_active.setdefault(drug, set()).add(uniprot)
 	return 
 
     def get_synonyms(self, drugs_with_target=None):
@@ -266,23 +278,23 @@ def get_drug_targets(file_name, drugs_file=None):
     drugs = None
     if drugs_file is not None:
 	drugs = set([ line.strip().lower() for line in open(drugs_file) ])
-	exp = re.compile("brain")
-	exp2 = re.compile("metastasis")
+	#exp = re.compile("brain")
+	#exp2 = re.compile("metastasis")
 	for drug, description in parser.drug_to_description.iteritems():
 	    #drug = drug.lower()
 	    if description is None:
 		continue
-	    m = exp.search(description)
-	    m2 = exp2.search(description)
-	    if True: #! m is not None and m2 is not None:
+	    #m = exp.search(description)
+	    #m2 = exp2.search(description)
+	    if True: # m is not None and m2 is not None:
 		drugs.add(drug)
 	for drug, indication in parser.drug_to_indication.iteritems():
 	    #drug = drug.lower()
 	    if indication is None:
 		continue
-	    m = exp.search(indication)
-	    m2 = exp2.search(indication)
-	    if True: #! m is not None and m2 is not None:
+	    #m = exp.search(indication)
+	    #m2 = exp2.search(indication)
+	    if True: # m is not None and m2 is not None:
 		drugs.add(drug)
 	#print drugs
 

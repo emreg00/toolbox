@@ -38,6 +38,7 @@ except:
 
 #MIN_NUMBER_OF_PERTURBATION = 25
 MAX_NUMBER_OF_TRIAL = 10
+FINITE_INFINITY = 999999
 
 def main():
     g = create_network_from_sif_file("interactions.sif")
@@ -243,7 +244,9 @@ def get_background_normalized_separation_distance(network, sp, targets, seeds, d
 	values[i] = d_random
     m, s = numpy.mean(values), numpy.std(values)
     d -= m
-    if s != 0:
+    if s == 0:
+	d = 0.0
+    else:
 	d /= s
     return d
 
@@ -271,7 +274,7 @@ def get_normalized_source_to_target_distance(target_to_distance, target_to_value
 	    m, s = numpy.mean(arr), numpy.std(arr)
 	    val = target_to_distance[target] - m
 	    if val == 0:
-		z = val
+		z = 0.0
 	    else:
 		z = val / s
 	else:
@@ -315,6 +318,17 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	    elif distance[len("rank-"):] == ("shortest", "shortest-min"):
 		source_to_target_distance[geneid_source] = numpy.mean(values)
 	return source_to_target_distance
+    #! subsetting seed/target set, consider only closest 3 seeds/targets with d <= 2
+    #geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target) # subseting seeds (geneids_target)
+    geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source) # subsetting targets (geneids_source)
+    if len(geneids_source_sub) == 0: # len(geneids_target_sub) == 0:
+	for geneid in geneids_target: # geneids_source:
+	    val = FINITE_INFINITY
+	    source_to_target_distance[geneid] = val
+	return source_to_target_distance
+    #geneids_target = geneids_target_sub
+    geneids_source = geneids_source_sub
+    #! subsetting seed/target set
     for geneid in geneids_source:
 	if distance.startswith("net"): # GUILD scores
 	    if target_mean_and_std is not None:
@@ -359,7 +373,7 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		else:
 		    if geneid_target not in lengths:
 			#print "Warning: node not connected", geneid_target
-			val = 999
+			val = FINITE_INFINITY
 		    else:
 			val = lengths[geneid_target]
 		values.append(val)
@@ -405,13 +419,15 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		d = numpy.abs(numpy.array(values) - center_values)
 		val = numpy.mean(d)
 		std = numpy.std(center_values)
-		if std > 0:
-		    val /= std
+		if std == 0:
+		    std = 0.01
+		val /= std
 	    elif distance == "mahalanobis-kernel":
 		values = numpy.abs(numpy.array(values) - center_values)
 		std = numpy.std(center_values)
-		if std > 0:
-		    values /= std
+		if std == 0:
+		    std = 0.01
+		values /= std
 		val = -numpy.log(numpy.mean([numpy.exp(-value) for value in values]))
 	    else:
 		raise ValueError("Unknown distance type " + distance)
@@ -419,6 +435,26 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
     if distance.startswith("mahalanobis"):
 	return source_to_target_distance, center_d
     return source_to_target_distance
+
+def get_optimal_subset(sp, geneids_source, geneids_target):
+    #!
+    n_cutoff = FINITE_INFINITY # 3
+    d_cutoff = 2.0 # FINITE_INFINITY
+    geneids_target_sub = set() 
+    values = []
+    for geneid_target in geneids_target:
+	lengths = sp[geneid_target]
+	for geneid in geneids_source:
+	    val = lengths[geneid]
+	    values.append((val, geneid_target))
+    values.sort()
+    for val, geneid in values:
+	if len(geneids_target_sub) == n_cutoff:
+	    break
+	if val <= d_cutoff:
+	    geneids_target_sub.add(geneid)
+    return geneids_target_sub
+
 
 def get_source_to_average_target_overlap(network, geneids_source, geneids_target, distance):
     """

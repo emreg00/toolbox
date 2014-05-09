@@ -73,7 +73,8 @@ class GOGOAParser(object):
 		else:
 		    raise ValueError("Uknown db_name %s" % db_name) 
 	    elif id_type == "genesymbol":
-		go_id_to_genes.setdefault(go_id, set()).add((gene_name, tax_id))
+		for tax_id in tax_ids:
+		    go_id_to_genes.setdefault(go_id, set()).add((gene_name, tax_id))
 	    else:
 		raise ValueError("Unknown id_type %s" % id_type)
 	    

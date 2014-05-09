@@ -47,7 +47,7 @@ class Relationship:
         return "relationship: %s %s ! %s"%(self.type, self.id, self.name)
 
 
-def getOboGraph(fname, save_synonyms = False):
+def getOboGraph(fname, save_synonyms = False, exclude_obsolete = True):
     obo_file = open(fname, 'rb')
 
     obo = nx.DiGraph()
@@ -89,6 +89,9 @@ def getOboGraph(fname, save_synonyms = False):
 		    if stanza.subset.startswith("goslim"):
 			obo.node[id]['a'] = True
 		elif stanza.type == "obsolete":
+		    if exclude_obsolete:
+			continue
+		    else:
 			obo.node[id]['o'] = True
 		# Synonyms 
 		elif save_synonyms and stanza.type == "synonym":
