@@ -319,16 +319,26 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		source_to_target_distance[geneid_source] = numpy.mean(values)
 	return source_to_target_distance
     #! subsetting seed/target set, consider only closest 3 seeds/targets with d <= 2
-    #geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target) # subseting seeds (geneids_target)
-    geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source) # subsetting targets (geneids_source)
-    if len(geneids_source_sub) == 0: # len(geneids_target_sub) == 0:
-	for geneid in geneids_target: # geneids_source:
-	    val = FINITE_INFINITY
-	    source_to_target_distance[geneid] = val
-	return source_to_target_distance
-    #geneids_target = geneids_target_sub
-    geneids_source = geneids_source_sub
-    #! subsetting seed/target set
+    optimal_subset = None # seeds None
+    if optimal_subset is not None:
+	n_cutoff = 1 # FINITE_INFINITY
+	d_cutoff = FINITE_INFINITY
+	if optimal_subset == "seeds": # subseting seeds (geneids_target)
+	    geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff) 
+	    if len(geneids_target_sub) == 0: 
+		for geneid in geneids_source: 
+		    val = FINITE_INFINITY
+		    source_to_target_distance[geneid] = val
+		return source_to_target_distance
+	    geneids_target = geneids_target_sub
+	elif optimal_subset == "targets": # subsetting targets (geneids_source)
+	    geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source, n_cutoff, d_cutoff)
+	    if len(geneids_source_sub) == 0: 
+		for geneid in geneids_target: 
+		    val = FINITE_INFINITY
+		    source_to_target_distance[geneid] = val
+		return source_to_target_distance
+	    geneids_source = geneids_source_sub
     for geneid in geneids_source:
 	if distance.startswith("net"): # GUILD scores
 	    if target_mean_and_std is not None:
@@ -386,6 +396,8 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		val = numpy.sqrt(numpy.mean(values*values))
 	    elif distance == "kernel" or distance == "kernel-min":
 		val = -numpy.log(numpy.mean([numpy.exp(-value-1) for value in values])) 
+            elif distance == "kernel2": 
+		val = 0.1/numpy.mean([numpy.exp(-value) for value in values])
 	    elif distance == "closest" or distance == "closest-min":
 		val = min(values)
 	    elif distance == "closest-adjust":
@@ -436,10 +448,7 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	return source_to_target_distance, center_d
     return source_to_target_distance
 
-def get_optimal_subset(sp, geneids_source, geneids_target):
-    #!
-    n_cutoff = FINITE_INFINITY # 3
-    d_cutoff = 2.0 # FINITE_INFINITY
+def get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff):
     geneids_target_sub = set() 
     values = []
     for geneid_target in geneids_target:

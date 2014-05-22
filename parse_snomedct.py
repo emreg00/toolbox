@@ -1,7 +1,7 @@
 import networkx
 
 def main():
-    base_dir = "/home/emre/data/snomedct/SnomedCT_Release_INT_20130731/RF2Release/Full/Terminology/"
+    base_dir = "/home/emre/data/ontology/snomedct/SnomedCT_Release_INT_20130731/RF2Release/Full/Terminology/"
     desc_file = base_dir + "sct2_Description_Full-en_INT_20130731.txt"
     rel_file = base_dir + "sct2_Relationship_Full_INT_20130731.txt"
     s = SNOMEDCT(desc_file, rel_file)
@@ -13,7 +13,7 @@ def main():
     concept_id = s.get_concept_ids(concept)[1]
     print concept_id, g.edges([concept_id])
     for u, v in g.edges([concept_id]):
-	print s.get_concept(v)
+	print v, s.get_concept(v)
     return
 
 class SNOMEDCT(object):

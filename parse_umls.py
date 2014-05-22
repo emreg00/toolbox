@@ -1,11 +1,14 @@
 import networkx
 
 def main():
-    base_dir = "/home/emre/arastirma/data/umls/2013AA/META/"
+    base_dir = "/home/emre/arastirma/data/ontology/umls/2013AA/META/"
     desc_file = base_dir + "MRCONSO.RRF"
     rel_file = base_dir + "MRREL.RRF"
     #get_basic_info(desc_file, rel_file)
-    get_drug_info(desc_file, rel_file)
+    #get_drug_info(desc_file, rel_file)
+    mesh_id_to_name, concept_id_to_mesh_id = get_mesh_id_mapping(desc_file)
+    print len(mesh_id_to_name)
+    print mesh_id_to_name["D003924"]
     return
 
 class UMLS(object):
@@ -20,14 +23,14 @@ class UMLS(object):
 	self.concept_id_to_relations = None
 	return
 
-    def get_concept_info(self, concept_types=None, concept_sources=None):
+    def get_concept_info(self, concept_types=None, concept_sources=None, only_preferred=True):
 	if self.concept_id_to_values is not None and self.concept_to_concept_id is not None:
 	    return self.concept_id_to_values, self.concept_to_concept_id
 	self.concept_id_to_values = {}
 	self.concept_to_concept_id = {}
 	f = open(self.file_name_desc)
 	header_names = ["CUI", "LAT", "TS", "LUI", "STT", "SUI", "ISPREF", "AUI", "SAUI", "SCUI", "SDUI", "SAB", "TTY", "CODE", "STR", "SRL", "SUPPRESS", "CVF", "dummy"]
-	# CUI / LAT (ENG) / TS (P) / STT (PF/VO) all / ISPREF (Y) / SCUI - source based id / SAB - source / TTY (PT/SY) pt-prefered sy-synonym / CODE similar to SCUI / STR
+	# CUI / LAT (ENG) / TS (P) / STT (PF/VO) all / ISPREF (Y) / SCUI - source based id / SAB - source / TTY (PT/SY) pt-preferred sy-synonym / CODE similar to SCUI / STR
 	col_to_idx = dict((val.lower(), i) for i, val in enumerate(header_names))
 	for line in f:
 	    words = line.strip("\n").split(self.delim)
@@ -35,7 +38,9 @@ class UMLS(object):
 	    #if concept_id == "C0360380":
 	    #	print len(words), words
 	    #	print words[col_to_idx["ts"]], words[col_to_idx["ispref"]], words[col_to_idx["tty"]]
-	    if words[col_to_idx["lat"]] != "ENG" or words[col_to_idx["ispref"]] != "Y": # words[col_to_idx["ts"]] != "P" 
+	    if words[col_to_idx["lat"]] != "ENG": # words[col_to_idx["ts"]] != "P" 
+		continue
+	    if only_preferred and words[col_to_idx["ispref"]] != "Y": 
 		continue
 	    concept_type = words[col_to_idx["tty"]]
 	    if concept_types is not None and concept_type not in concept_types: 
@@ -122,10 +127,10 @@ class UMLS(object):
 
     def get_drug_disease_relations(self):
 	drug_to_diseases = {}
-	for nodes in self.get_ontology().edges():
+	for nodes in self.get_ontology(root_concept="Pharmaceutical / biologic product", relation_types=set(["isa"]), source_types=set(["SNOMEDCT"])).edges():
 	    for node in nodes:
 		try:
-		    rels = self.get_relations()[node]
+		    rels = self.get_relations(relation_types=set(["treats", "may_treat"]), source_types=None)[node]
 		except:
 		    continue
 		for cid, values in rels.iteritems():
@@ -138,14 +143,25 @@ class UMLS(object):
 	return drug_to_diseases
 
 
-def get_mesh_id_to_name(desc_file):
+def get_mesh_id_mapping(desc_file, include_synonyms=False):
     u = UMLS(desc_file, None)
-    concept_id_to_values, concept_to_concept_id = u.get_concept_info(concept_types = set(["MH"]), concept_sources = set(["MSH"]))
+    concept_sources = set(["MSH"])
+    concept_types = None 
+    if include_synonyms:
+	concept_id_to_values, concept_to_concept_id = u.get_concept_info(concept_types = concept_types, concept_sources = concept_sources, only_preferred=False)
+    else:
+	concept_types = set(["MH"])
+	concept_id_to_values, concept_to_concept_id = u.get_concept_info(concept_types = concept_types, concept_sources = concept_sources, only_preferred=False)
     source_id_to_concept = {}
+    concept_id_to_mesh_id = {}
     for concept_id, values in concept_id_to_values.iteritems():
     	for concept, source_id, concept_type in values["MSH"]:
 	    source_id_to_concept[source_id] = concept
-    return source_id_to_concept
+	    #if concept_id in concept_id_to_mesh_id and concept_id_to_mesh_id[concept_id] != source_id:
+	    #	print "Inconsistency", concept_id, source_id 
+	    concept_id_to_mesh_id[concept_id] = source_id
+    return source_id_to_concept, concept_id_to_mesh_id
+
 
 def get_basic_info(desc_file, rel_file):
     u = UMLS(desc_file, rel_file)
@@ -165,6 +181,7 @@ def get_basic_info(desc_file, rel_file):
 	print cid, values
     return
 
+
 def get_drug_info(desc_file, rel_file):
     u = UMLS(desc_file, rel_file)
     drug_to_diseases = u.get_drug_disease_relations()
@@ -172,7 +189,8 @@ def get_drug_info(desc_file, rel_file):
     	print drug, diseases
     return
 
-def get_disease_specific_drugs(umls, name_to_drug, synonym_to_drug, phenotypes):
+
+def get_disease_specific_drugs(umls, selected_drugs, name_to_drug, synonym_to_drug, phenotypes):
     drug_to_diseases = umls.get_drug_disease_relations()
     disease_to_drugs = {}
     for drug, diseases in drug_to_diseases.iteritems():
@@ -182,6 +200,8 @@ def get_disease_specific_drugs(umls, name_to_drug, synonym_to_drug, phenotypes):
 	elif drug in synonym_to_drug:
 	    drugbank_id = synonym_to_drug[drug]
 	else:
+	    continue
+	if drugbank_id not in selected_drugs:
 	    continue
 	for description in diseases:
 	    description = description.lower()

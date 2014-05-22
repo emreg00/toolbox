@@ -152,31 +152,49 @@ class DrugBankXMLParser(object):
 		    self.drug_to_targets_active.setdefault(drug, set()).add(uniprot)
 	return 
 
-    def get_synonyms(self, drugs_with_target=None):
+    def get_synonyms(self, selected_drugs=None):
 	name_to_drug = {}
 	for drug, name in self.drug_to_name.iteritems():
-	    if drugs_with_target is not None and drug not in drugs_with_target:
+	    if selected_drugs is not None and drug not in selected_drugs:
 		continue
 	    name_to_drug[name.lower()] = drug
 	synonym_to_drug = {}
 	for drug, synonyms in self.drug_to_synonyms.iteritems():
 	    for synonym in synonyms:
-		if drugs_with_target is not None and drug not in drugs_with_target:
+		if selected_drugs is not None and drug not in selected_drugs:
 		    continue
 		synonym_to_drug[synonym.lower()] = drug
 	for drug, brands in self.drug_to_brands.iteritems():
 	    for brand in brands:
-		if drugs_with_target is not None and drug not in drugs_with_target:
+		if selected_drugs is not None and drug not in selected_drugs:
 		    continue
 		synonym_to_drug[brand.lower()] = drug
 	return name_to_drug, synonym_to_drug
 
 
-def get_disease_specific_drugs(parser, phenotypes):
+def get_drugs_by_group(parser, groups_to_include = set(["approved"]), groups_to_exclude=set(["withdrawn"])):
+    selected_drugs = set()
+    for drugbank_id, name in parser.drug_to_name.iteritems():
+	# Consider only approved drugs
+	if drugbank_id not in parser.drug_to_groups:
+	    continue
+	groups = parser.drug_to_groups[drugbank_id]
+	#if "approved" not in groups or "withdrawn" in groups: 
+	if len(groups & groups_to_include) == 0:
+	    continue
+	if len(groups & groups_to_exclude) > 0:
+	    continue
+	selected_drugs.add(drugbank_id)
+    return selected_drugs
+
+
+def get_disease_specific_drugs(parser, selected_drugs, phenotypes):
     import text_utilities
     disease_to_drugs = {}
     indication_to_diseases = {}
     for drug, indication in parser.drug_to_indication.iteritems():
+	if drug not in selected_drugs:
+	    continue
 	if indication is None:
 	    continue
 	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
