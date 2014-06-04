@@ -38,7 +38,10 @@ class TsvReader(FormattedFileProcessor):
 	file = open(self.input_file_name)
 	# Read header
 	line = file.readline()
-	cols = [ c.lower().strip(self.quotation) for c in line.strip("\n").split(self.delim) ]
+	delim = self.delim
+	if self.quotation is not None and self.delim is not None:
+	    delim = self.quotation + self.delim + self.quotation
+	cols = [ c.lower().strip(self.quotation) for c in line.strip("\n").split(delim) ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	    fields_to_include = []
@@ -51,17 +54,14 @@ class TsvReader(FormattedFileProcessor):
 	if merge_inner_values:
 	    if self.inner_delim is None:
 		raise Exception("merge_inner_values requires that inner_delim is defined!")
-	#print "Start:", columns 
 	id_to_values = {}
 	line_prev = line
 	line = file.readline()
-	#vals = line.strip().split(self.delim)
-	#print vals
 	if isinstance(keys_to_include, list):
 	    keys_to_include = set(keys_to_include)
 	while line:
 	    try:
-		vals = line.rstrip("\n").split(self.delim)
+		vals = line.rstrip("\n").split(delim)
 		id_ = vals[columns[first_column]].strip(self.quotation)
 		if keys_to_include is None or id_ in keys_to_include:
 		    new_vals = []

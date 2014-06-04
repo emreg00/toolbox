@@ -13,6 +13,7 @@ def main():
 
 def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
     disease_to_drugs = {}
+    #disease_id_to_drugs = {}
     mesh_ids = set(phenotype_to_mesh_id.values())
     for drugbank_id, diseases in drug_to_diseases.iteritems():
 	for disease, dui, val in diseases:
@@ -21,6 +22,7 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
 		#if phenotype_to_mesh_id[disease] != dui:
 		#    print "Warning: Inconsistent dui", disease, phenotype_to_mesh_id[disease], dui
 		disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
+		#disease_id_to_drugs(dui, set()).add(drugbank_id)
     return disease_to_drugs
 
 

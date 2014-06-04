@@ -2,6 +2,7 @@ import urllib2, os, cPickle
 from bs4 import BeautifulSoup
 from diseasome.src import diseasome
 from xml.etree.ElementTree import iterparse
+import time
 
 def main():
     #drug = "metformin" 
@@ -11,7 +12,7 @@ def main():
     return
 
 
-def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
+def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id, cutoff_qvalue = 0.05):
     disease_to_drugs = {}
     mesh_ids = set(phenotype_to_mesh_id.values())
     for drugbank_id, diseases in drug_to_diseases.iteritems():
@@ -20,7 +21,8 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
 		disease = disease.lower()
 		#if phenotype_to_mesh_id[disease] != dui:
 		#    print "Warning: Inconsistent dui", disease, phenotype_to_mesh_id[disease], dui
-		disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
+		if float(val) <= cutoff_qvalue:
+		    disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
     return disease_to_drugs
 
 
@@ -28,11 +30,10 @@ def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mes
     if os.path.exists(dump_file):
 	drug_to_diseases = cPickle.load(open(dump_file))
 	return drug_to_diseases 
-    f = open(dump_file + ".txt", 'a')
     drug_to_diseases = {}
     #flag = False
     for drugbank_id in selected_drugs:
-	#if drugbank_id == "DB01179":
+	#if drugbank_id == "DB00956":
 	#    flag = True
 	#if flag == False:
 	#    continue
@@ -51,16 +52,20 @@ def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mes
 	if len(diseases) == 0:
 	    print
 	    continue
+        f = open(dump_file + ".txt", 'a')
 	diseases_mod = []
 	for phenotype, dui, q_value in diseases:
 	    if dui in mesh_ids: 
-		drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, q_value))
+		#drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, q_value))
 		diseases_mod.append((phenotype, dui, q_value))
 		f.write("%s\t%s\t%s\t%e\n" % (drugbank_id, phenotype, dui, q_value))
 	    #else:
 	    #	print "\nNot in UMLS:", dui, phenotype
+        f.close()
 	print diseases_mod
-    f.close()
+    for line in open(dump_file + ".txt"):
+        (drugbank_id, phenotype, dui, q_value) = line.strip().split("\t")
+        drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, q_value))
     cPickle.dump(drug_to_diseases, open(dump_file,'w'))
     return drug_to_diseases
 
@@ -78,6 +83,7 @@ def get_data(command, parameter):
 	try:
 	    response = urllib2.urlopen(req)
 	except urllib2.URLError:
+            time.sleep(10)
 	    continue
 	break
     return response

@@ -319,9 +319,9 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		source_to_target_distance[geneid_source] = numpy.mean(values)
 	return source_to_target_distance
     #! subsetting seed/target set, consider only closest 3 seeds/targets with d <= 2
-    optimal_subset = None # seeds None
+    optimal_subset = None # "targets" "seeds" None
     if optimal_subset is not None:
-	n_cutoff = 1 # FINITE_INFINITY
+	n_cutoff = 4 # FINITE_INFINITY
 	d_cutoff = FINITE_INFINITY
 	if optimal_subset == "seeds": # subseting seeds (geneids_target)
 	    geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff) 
@@ -400,6 +400,8 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 		val = 0.1/numpy.mean([numpy.exp(-value) for value in values])
 	    elif distance == "closest" or distance == "closest-min":
 		val = min(values)
+	    elif distance == "binary":
+                val = sum(map(lambda x: x>1, values))
 	    elif distance == "closest-adjust":
 		values.sort()
 		val_min = values[0]
@@ -890,7 +892,7 @@ def get_degree_equivalents(seeds, bins, g):
     return seed_to_nodes
 
 
-def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random, degree_aware=True):
+def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random, degree_aware=True, connected=False):
     """
     Use get_degree_binning to get bins
     """
@@ -898,12 +900,27 @@ def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random,
     nodes = network.nodes()
     for i in xrange(n_random):
 	if degree_aware:
+	    if connected:
+		raise ValueError("Not implemented!")
 	    nodes_random = []
 	    node_to_equivalent_nodes = get_degree_equivalents(nodes_selected, bins, network)
 	    for node, equivalent_nodes in node_to_equivalent_nodes.iteritems():
 		nodes_random.append(random.choice(equivalent_nodes))
 	else:
-	    nodes_random = random.sample(nodes, len(nodes_selected))
+	    if connected:
+		nodes_random = [ random.choice(nodes) ]
+		i = 1
+		while True:
+		    if i == len(nodes_selected):
+			break
+		    node_random = random.choice(nodes_random)
+		    node_selected = random.choice(network.neighbors(node_random))
+		    if node_selected in nodes_random:
+			continue
+		    nodes_random.append(node_selected)
+		    i += 1
+	    else:
+		nodes_random = random.sample(nodes, len(nodes_selected))
 	values.append(nodes_random)
     return values
 

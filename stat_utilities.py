@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+from numpy import median
 
 def main():
     import sys
@@ -76,24 +77,44 @@ def correlation(x, y, cor_type="pearson"):
 	raise ValueError("Invalid correlation type!")
     return coef, pval
 
-def statistical_test(x, y, test_type="wilcoxon"):
+def statistical_test(x, y, test_type="wilcoxon", alternative="two-sided"):
     # test stat, p-val
     if test_type == "t":
-	stat, pval = np.ravel(stats.ttest_ind(x, y))
-    elif test_type == "wilcoxon":
+	stat, pval = np.ravel(stats.ttest_ind(x, y, equal_var=False))
+    elif test_type == "wilcoxon": # Requires equal size
 	stat, pval = np.ravel(stats.wilcoxon(x, y))
-    elif test_type == "mannwhitney":
+    elif test_type == "mannwhitney": # returns one-sided by default
 	stat, pval = np.ravel(stats.mannwhitneyu(x, y))
-    elif test_type == "kolmogorovsmirnov":
+    elif test_type == "ks":
 	stat, pval = np.ravel(stats.ks_2samp(x,y))
     else:
 	raise ValueError("Invalid correlation type!")
-    # To convert p-value to one-way need to apply the following
-    # taking into account the direction of the comparison
-    # if stat >= 0:
-    # 	pval = pval[1] / 2
-    # else:
-    #	pval = 1 - pval[1] / 2
+    #return stat, pval
+    # To convert p-value to one-way, it is inconsistent with R though
+    if test_type == "wilcoxon":
+	stat2 = median(x) - median(y)
+	if stat2 >= 0:
+	    if alternative == "greater":
+		pval = pval / 2
+	    elif alternative == "less":
+		pval = 1 - pval / 2
+	else:
+	    if alternative == "greater":
+		pval = 1 - pval / 2
+	    elif alternative == "less":
+		pval = pval / 2
+    elif test_type == "mannwhitney":
+	stat2 = median(x) - median(y)
+	if alternative == "two-sided":
+	    pval = (2 * pval)
+	elif alternative == "less":
+	    if stat2 >= 0: 
+		pval = 1 - pval
+	elif alternative == "greater":
+	    if stat2 < 0:
+		pval = 1 - pval
+    elif alternative != "two-sided":
+	raise ValueError("Not implemented!")
     return stat, pval
 
 def hypergeometric_test(picked_good, picked_all, all_all, all_good):

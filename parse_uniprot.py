@@ -28,9 +28,29 @@ def main():
     return
 
 
-def get_uniprot_to_geneid(file_name, uniprot_ids=None):
+def get_uniprot_to_geneid(file_name):
+    """
+    To parse HUMAN_9606_idmapping.dat file (trimmed to two columns) from Uniprot 
+    """
+    uniprot_to_geneid = {}
+    #geneid_to_uniprots = {}
+    f = open(file_name)
+    f.readline()
+    for line in f:
+	uniprot, geneid = line.split("\t")
+	geneid = geneid.strip()
+	uniprot = uniprot.strip()
+	if geneid == "" or uniprot == "":
+	    continue
+	uniprot_to_geneid[uniprot] = geneid
+    f.close()
+    return uniprot_to_geneid
+
+
+def get_uniprot_to_geneid_from_idmapping_file(file_name, uniprot_ids=None):
     """
     To parse idmapping.tab from Uniprot 
+    Useful for id mapping of non-human species
     """
     parser = TsvReader.TsvReader(file_name, delim="\t", inner_delim=";")
     column_to_index, id_to_values = parser.read(fields_to_include=["UniProtKB-AC", "GeneID (EntrezGene)"], keys_to_include=uniprot_ids, merge_inner_values=True)

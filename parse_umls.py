@@ -156,7 +156,10 @@ def get_mesh_id_mapping(desc_file, include_synonyms=False):
     concept_id_to_mesh_id = {}
     for concept_id, values in concept_id_to_values.iteritems():
     	for concept, source_id, concept_type in values["MSH"]:
-	    source_id_to_concept[source_id] = concept
+            if include_synonyms == False:
+                source_id_to_concept[source_id] = concept
+            else:
+                source_id_to_concept.setdefault(source_id, set()).add(concept)
 	    #if concept_id in concept_id_to_mesh_id and concept_id_to_mesh_id[concept_id] != source_id:
 	    #	print "Inconsistency", concept_id, source_id 
 	    concept_id_to_mesh_id[concept_id] = source_id
