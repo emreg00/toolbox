@@ -8,6 +8,7 @@ def convert_to_R_string(txt, mapping=[(" ", "."), (",", ""), ("'", "")]):
 
 def tokenize_disease_name(disease):
     disease_mod = disease.replace(" and ", ", ")
+    disease_mod = disease.replace("-", ", ")
     phrases = disease_mod.split(",")
     values = []
     for phrase in phrases:

@@ -26,8 +26,9 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
     """
     from numpy import array, empty
     pvalues = array(pvalues)
-    n = float(pvalues.shape[0])
+    n = pvalues.shape[0]
     new_pvalues = empty(n)
+    n = float(n)
     if correction_type == "Bonferroni":
 	new_pvalues = n * pvalues
     elif correction_type == "Bonferroni-Holm":

@@ -1,4 +1,72 @@
 from toolbox import guild_utilities, selection_utilities
+from sklearn.metrics import roc_auc_score
+from selection_utilities import generate_samples_from_list_without_replacement
+import numpy
+
+
+def get_balanced_auc(predictions_true, predictions_false, replicable = None):
+    if replicable is not None:
+        predictions_t, predictions_f = balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable = replicable)
+        auc = get_auc(predictions_t, predictions_f)
+        sd = 0
+	values_balanced_t = []
+	values_balanced_f = []
+    else:
+        n_random = 100
+	values_balanced_t = None
+	values_balanced_f = None
+        values = numpy.empty(n_random)
+        for i in xrange(n_random):
+            predictions_t, predictions_f = balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable = replicable)
+            values[i] = get_auc(predictions_t, predictions_f)
+	    if values_balanced_t is None or values_balanced_f is None:
+		values_balanced_t = numpy.array(predictions_t)
+		values_balanced_f = numpy.array(predictions_f)
+	    else:
+		values_balanced_t += predictions_t
+		values_balanced_f += predictions_f
+        auc = numpy.mean(values)
+        sd = numpy.std(values)
+	values_balanced_t /= n_random
+	values_balanced_f /= n_random
+    return auc, sd, values_balanced_t, values_balanced_f
+
+
+def get_auc(predictions_true, predictions_false):
+    predictions = predictions_true + predictions_false
+    labels = [ 1 ] * len(predictions_true) + [ 0 ] * len(predictions_false)
+    y_scores = numpy.array(predictions) # [0.1, 0.4, 0.35, 0.8]
+    y_true = numpy.array(labels) # [0, 0, 1, 1]
+    auc = roc_auc_score(y_true, y_scores)
+    return auc
+
+
+def balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable=123):
+    """
+    n_random_negative_folds: Number of negative scores to be averaged to be assigned as negative instance. 
+    If None calculated to cover as much as non-seed scores as possible
+    """
+    assert len(predictions_true) != len(predictions_false)
+    swap = False
+    if len(predictions_false) < len(predictions_true):
+	swap = True
+	predictions = predictions_true
+	predictions_true = predictions_false
+	predictions_false = predictions
+    negative_sample_size = len(predictions_true)
+    negative_scores = [ 0.0 ] * negative_sample_size
+    n_fold = 0
+    for sample in generate_samples_from_list_without_replacement(predictions_false, negative_sample_size, n_random_negative_folds, replicable = replicable):
+	if len(sample) < negative_sample_size: # last fold
+	    continue
+	n_fold += 1
+	for i, val in enumerate(sample):
+	    negative_scores[i] += val
+    predictions_false = map(lambda x: x/n_fold, negative_scores)
+    if swap:
+	return predictions_false, predictions_true
+    return predictions_true, predictions_false
+
 
 def create_R_script(file_name, absolute_dir, title=None, only=None, show_spread=False, vertical_average=False, append=False):
     if title is not None:
@@ -137,7 +205,6 @@ def get_validation_node_scores_and_labels(file_result, file_seed_test_scores, fi
 	default_score: All nodes that have a higher score than this score in file_node_scores will be considered as seeds
     """
     from guild_utilities import get_node_to_score, get_nodes
-    from selection_utilities import generate_samples_from_list_without_replacement
 
     node_to_score = get_node_to_score(file_result)
     test_nodes = get_nodes(file_seed_test_scores)
@@ -203,6 +270,7 @@ def calculate_performance_metric_counts_using_random_negatives(node_to_score, se
 	nFP /= n_actual_folds
 	nTN /= n_actual_folds
     return (nTP, nFP, nFN, nTN)
+
 
 def calculatePerformance(nTP, nFP, nFN, nTN):
     try:

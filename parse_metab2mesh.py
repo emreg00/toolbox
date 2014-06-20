@@ -28,8 +28,8 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id, cutoff_qv
 
 def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mesh_ids, dump_file):
     if os.path.exists(dump_file):
-	drug_to_diseases = cPickle.load(open(dump_file))
-	return drug_to_diseases 
+    	drug_to_diseases = cPickle.load(open(dump_file))
+    	return drug_to_diseases 
     drug_to_diseases = {}
     #flag = False
     for drugbank_id in selected_drugs:
@@ -42,7 +42,7 @@ def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mes
 	diseases = get_compound_to_mesh_concepts(drug) #, 1e-10) 
 	if len(diseases) == 0:
 	    if drugbank_id not in drug_to_synonyms:
-		print
+		print drugbank_id
 		continue
 	    for synonym in drug_to_synonyms[drugbank_id]:
 		drug = synonym.lower()

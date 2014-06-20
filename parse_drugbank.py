@@ -209,12 +209,21 @@ def get_disease_specific_drugs(parser, selected_drugs, phenotypes):
 	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
 	    values = text_utilities.tokenize_disease_name(disease)
 	    #print disease, values
+	    indication_to_diseases.setdefault(indication, set())
 	    if all([ indication.find(word.strip()) != -1 for word in values ]):
 		#print disease, drug
 		disease_to_drugs.setdefault(disease, set()).add(drug)
 		indication_to_diseases.setdefault(indication, set()).add(disease)
 	    else:
-		indication_to_diseases.setdefault(indication, set())
+		values = text_utilities.tokenize_disease_name(disease.replace("2", "II"))
+		if all([ indication.find(word.strip()) != -1 for word in values ]):
+		    disease_to_drugs.setdefault(disease, set()).add(drug)
+		    indication_to_diseases.setdefault(indication, set()).add(disease)
+		else:
+		    values = text_utilities.tokenize_disease_name(disease.replace("1", "I"))
+		    if all([ indication.find(word.strip()) != -1 for word in values ]):
+			disease_to_drugs.setdefault(disease, set()).add(drug)
+			indication_to_diseases.setdefault(indication, set()).add(disease)
     # Print non-matching indications #!
     for indication, diseases in indication_to_diseases.iteritems():
 	if len(diseases) == 0:

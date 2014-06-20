@@ -173,6 +173,24 @@ def get_all_paths_between(G, source_id, target_id, cutoff=None):
     return networkx.all_simple_paths(G, source_id, target_id, cutoff)
 
 @dumper
+def get_clustering_coefficient(g, dump_file):
+    return networkx.clustering(g)
+
+
+@dumper
+def get_closeness_vitality(g, dump_file):
+    return networkx.closeness_vitality(g)
+
+
+def get_network_radius(g):
+    return networkx.radius(g)
+
+
+def get_network_degree_histogram(g):
+    return networkx.degree_histogram(g)
+
+
+@dumper
 def get_node_betweenness(G, dump_file):
     return networkx.betweenness_centrality(G)
 
@@ -285,7 +303,44 @@ def get_normalized_source_to_target_distance(target_to_distance, target_to_value
     return target_to_normalized_distance #numpy.mean(arr), numpy.std(arr) # numpy.min(arr)
 
 
-def get_source_to_average_target_distance(sp, geneids_source, geneids_target, distance="shortest", target_mean_and_std = None, exclude_self = False):
+def get_distances_to_node(sp, node):
+    if isinstance(sp, dict):
+	lengths = sp[node]
+    else: # sp is networkx graph
+	lengths = networkx.single_source_shortest_path_length(sp, node)
+    return lengths
+
+
+def get_closest_nodes_from_other_set(sp, geneids_source, geneids_target, n_closest=1):
+    """
+    n_closest: None - get all nodes with min distance
+    """
+    source_to_target_distance = {}
+    for geneid in geneids_source:
+	lengths = get_distances_to_node(sp, geneid)
+        values = []
+        for geneid_target in geneids_target:
+            if geneid_target not in lengths:
+                #print "Warning: node not connected", geneid_target
+                val = FINITE_INFINITY
+            else:
+                val = lengths[geneid_target]
+            values.append((val, geneid_target))
+        values.sort()
+	if n_closest is None:
+	    prev_val = values[0][0]
+	    for val, geneid_target in values:
+		if val == prev_val:
+		    source_to_target_distance.setdefault(geneid, []).append((val, geneid_target))
+		else:
+		    break
+		prev_val = val
+	else:
+	    source_to_target_distance[geneid] = values[:n_closest]
+    return source_to_target_distance
+
+
+def get_source_to_average_target_distance(sp, geneids_source, geneids_target, distance="shortest", parameters={}, target_mean_and_std = None, exclude_self = False):
     """
     Returns average/min distance to target nodes for each source node
     If target_mean_and_std is provided calculatesn z-score using mean & std of the distance to target from every node
@@ -302,7 +357,7 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	elif distance == "mahalanobis-kernel": 
 	    center_d = -numpy.log(numpy.mean([numpy.exp(-value) for value in center_values]))
     elif distance == "jorg.individual":
-	target_to_distance = get_source_to_average_target_distance(sp, geneids_target, geneids_target, distance = "closest", target_mean_and_std = None, exclude_self=True)
+	target_to_distance = get_source_to_average_target_distance(sp, geneids_target, geneids_target, distance = "closest", parameters = parameters, target_mean_and_std = None, exclude_self=True)
 	center_d = numpy.mean(target_to_distance.values())
     elif distance.startswith("rank-"):
 	source_to_values = {}
@@ -318,27 +373,16 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	    elif distance[len("rank-"):] == ("shortest", "shortest-min"):
 		source_to_target_distance[geneid_source] = numpy.mean(values)
 	return source_to_target_distance
-    #! subsetting seed/target set, consider only closest 3 seeds/targets with d <= 2
-    optimal_subset = None # "targets" "seeds" None
-    if optimal_subset is not None:
-	n_cutoff = 4 # FINITE_INFINITY
-	d_cutoff = FINITE_INFINITY
-	if optimal_subset == "seeds": # subseting seeds (geneids_target)
-	    geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff) 
-	    if len(geneids_target_sub) == 0: 
-		for geneid in geneids_source: 
-		    val = FINITE_INFINITY
-		    source_to_target_distance[geneid] = val
-		return source_to_target_distance
-	    geneids_target = geneids_target_sub
-	elif optimal_subset == "targets": # subsetting targets (geneids_source)
-	    geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source, n_cutoff, d_cutoff)
-	    if len(geneids_source_sub) == 0: 
-		for geneid in geneids_target: 
-		    val = FINITE_INFINITY
-		    source_to_target_distance[geneid] = val
-		return source_to_target_distance
-	    geneids_source = geneids_source_sub
+    # subsetting seed/target set, e.g. consider only closest 3 seeds/targets with d <= 2 and k >= 10
+    if "subset" in parameters:
+	geneids_source_mod, geneids_target_mod = get_optimal_subsets_using_parameters(parameters, sp, geneids_source, geneids_target)
+	if len(geneids_target_mod) == 0 or len(geneids_source_mod) == 0: 
+	    for geneid in geneids_source: 
+		val = FINITE_INFINITY
+		source_to_target_distance[geneid] = val
+	    return source_to_target_distance
+        geneids_source = geneids_source_mod
+        geneids_target = geneids_target_mod
     for geneid in geneids_source:
 	if distance.startswith("net"): # GUILD scores
 	    if target_mean_and_std is not None:
@@ -450,11 +494,46 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	return source_to_target_distance, center_d
     return source_to_target_distance
 
-def get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff):
+
+def get_optimal_subsets_using_parameters(parameters, sp, geneids_source, geneids_target):
+    optimal_subset = parameters["subset"] # "targets" "seeds"
+    n_cutoff = FINITE_INFINITY
+    m_cutoff = FINITE_INFINITY
+    d_cutoff = FINITE_INFINITY
+    k_cutoff = 0
+    network = None
+    geneids_source_sub, geneids_target_sub = geneids_source, geneids_target
+    if "n" in parameters:
+	n_cutoff = parameters["n"] 
+    if "m" in parameters: # used only in both to subset targets
+	m_cutoff = parameters["m"] 
+    if "d" in parameters:
+	d_cutoff = parameters["d"]
+    if "k" in parameters:
+	k_cutoff = parameters["k"]
+	network = parameters["network"]
+    if optimal_subset == "seeds": # subseting seeds (geneids_target)
+	geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff, k_cutoff, network) 
+    elif optimal_subset == "targets": # subsetting targets (geneids_source)
+	geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source, n_cutoff, d_cutoff, k_cutoff, network)
+    elif optimal_subset == "both": # subsetting both seeds (geneids_target) and targets (geneids_source)
+	# subset seeds
+	geneids_target_sub = get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff, k_cutoff, network) 
+	# subset targets
+	geneids_source_sub = get_optimal_subset(sp, geneids_target, geneids_source, m_cutoff, d_cutoff, k_cutoff, network)
+    else:
+	raise ValueError("Unknown subsetting type: " + optimal_subset)
+    return geneids_source_sub, geneids_target_sub
+
+
+def get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff=FINITE_INFINITY, d_cutoff=FINITE_INFINITY, k_cutoff=0, network=None):
+    """
+    Get nodes of geneids_target that are closest (w.r.t. n/d/k restriction) to the geneids_source
+    """
     geneids_target_sub = set() 
     values = []
     for geneid_target in geneids_target:
-	lengths = sp[geneid_target]
+	lengths = get_distances_to_node(sp, geneid_target)
 	for geneid in geneids_source:
 	    val = lengths[geneid]
 	    values.append((val, geneid_target))
@@ -463,7 +542,11 @@ def get_optimal_subset(sp, geneids_source, geneids_target, n_cutoff, d_cutoff):
 	if len(geneids_target_sub) == n_cutoff:
 	    break
 	if val <= d_cutoff:
-	    geneids_target_sub.add(geneid)
+	    if network is None:
+		geneids_target_sub.add(geneid)
+	    else:
+		if network.degree(geneid) >= k_cutoff:
+		    geneids_target_sub.add(geneid)
     return geneids_target_sub
 
 
@@ -567,40 +650,41 @@ def get_source_to_average_target_overlap(network, geneids_source, geneids_target
 	raise ValueError("Unknown distance type " + distance)
     return source_to_target_distance
 
-def get_separation(network, sp, targets, seeds, distance, averaging_function=lambda x: numpy.mean(x)): 
+
+def get_separation(network, sp, targets, seeds, distance, parameters={}, averaging_function=lambda x: numpy.mean(x)): 
     """
     Potential averaging functions
     val = numpy.min(x) 
     val = numpy.mean(x) 
-    val = -numpy.log(numpy.mean([numpy.exp(-value) for value in x]))
+    val = -numpy.log(numpy.mean([numpy.exp(-value-1) for value in x]))
     jorg / mmtom / avg distances: knn-x, shortest, kernel, mahalanobis, tom, mtom, ... 
     """
     if distance.startswith("jorg-"):
 	distance = distance[len("jorg-"):] # closest was default before
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, seeds, distance = distance, target_mean_and_std = None, exclude_self=True)
+	target_to_distance = get_source_to_average_target_distance(sp, seeds, seeds, distance = distance, parameters = parameters, target_mean_and_std = None, exclude_self=True)
 	values = target_to_distance.values()
 	d1 = averaging_function(values)
-	target_to_distance = get_source_to_average_target_distance(sp, targets, targets, distance = distance, target_mean_and_std = None, exclude_self=True)
+	target_to_distance = get_source_to_average_target_distance(sp, targets, targets, distance = distance, parameters = parameters, target_mean_and_std = None, exclude_self=True)
 	values = target_to_distance.values()
 	d2 = averaging_function(values)
-	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = distance, target_mean_and_std = None)
+	target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance = distance, parameters = parameters, target_mean_and_std = None)
 	values = target_to_distance.values()
-	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = distance, target_mean_and_std = None)
+	target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, distance = distance, parameters = parameters, target_mean_and_std = None)
 	values.extend(target_to_distance.values())
 	d12 = averaging_function(values)
 	val = d12 - (d1 + d2) / 2.0
     elif distance.startswith("mahalanobis-jorg-"):
 	distance = distance[len("mahalanobis-jorg-"):] # mahalanobis is default before
-	target_to_distance, d1 = get_source_to_average_target_distance(sp, targets, seeds, distance)
+	target_to_distance, d1 = get_source_to_average_target_distance(sp, targets, seeds, distance, parameters = parameters)
 	values = target_to_distance.values()
-	target_to_distance, d2 = get_source_to_average_target_distance(sp, seeds, targets, distance)
+	target_to_distance, d2 = get_source_to_average_target_distance(sp, seeds, targets, distance, parameters = parameters)
 	values.extend(target_to_distance.values())
 	d12 = averaging_function(values)
 	val = d12 - (d1 + d2) / 2.0
     elif distance == "mahalanobis-pairwise":
-	target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis-shortest")
+	target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance = "mahalanobis-shortest", parameters = parameters)
 	values = target_to_distance.values()
-	target_to_distance, center_d = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis-shortest")
+	target_to_distance, center_d = get_source_to_average_target_distance(sp, seeds, targets, distance = "mahalanobis-shortest", parameters = parameters)
 	values.extend(target_to_distance.values())
 	val = averaging_function(values)
     elif distance == "center-pairwise":
@@ -685,9 +769,9 @@ def get_separation(network, sp, targets, seeds, distance, averaging_function=lam
 	if distance.endswith("tom") or distance.endswith("tom-min"):
 	    target_to_distance = get_source_to_average_target_overlap(network, targets, seeds, distance)
 	elif distance.startswith("mahalanobis"):
-	    target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance)
+	    target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance, parameters = parameters)
 	else:
-	    target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance)
+	    target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance, parameters = parameters)
 	values = target_to_distance.values()
 	if distance.endswith("-min"):
 	    val = numpy.min(values)
@@ -1216,18 +1300,6 @@ def get_jaccard_index_map(g):
 	v_neighbors = set(g.neighbors(v))
 	edge_to_jaccard[(u,v)] = float(len(u_neighbors & v_neighbors)) / len(u_neighbors | v_neighbors)
     return edge_to_jaccard 
-
-
-def get_clustering_coefficient_map(g):
-    return networkx.clustering(g, with_labels=True)
-
-
-def get_network_radius(g):
-    return networkx.radius(g)
-
-
-def get_network_degree_histogram(g):
-    return networkx.degree_histogram(g)
 
 
 def randomize_graph(graph, randomization_type, allow_self_edges = False):
