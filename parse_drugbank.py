@@ -39,6 +39,9 @@ class DrugBankXMLParser(object):
 	self.drug_to_targets_active = {}
 	self.partner_id_to_gene = {}
 	self.partner_id_to_uniprot = {}
+        self.drug_to_categories = {}
+        self.drug_to_atc_codes = {}
+        self.drug_to_inchi_key = {}
 	return
 
     def parse(self, selected_names=None, exp=None):
@@ -56,6 +59,7 @@ class DrugBankXMLParser(object):
 	drug_id_partner = None
 	partner_id = None
 	resource = None
+        current_property = None 
 	for (event, elem) in context:
 	    if event == "start":
 		state_stack.append(elem.tag)
@@ -63,7 +67,9 @@ class DrugBankXMLParser(object):
 		    if state_stack[-2] == self.NS+"partners":
 			partner_id = elem.attrib["id"]
 		elif elem.tag == self.NS+"resource":
-		    uniprot_resource = False
+		    resource = None
+		elif elem.tag == self.NS+"property":
+                    current_property = None
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
 			current_target = elem.attrib["partner"]
@@ -117,6 +123,12 @@ class DrugBankXMLParser(object):
 		elif elem.tag == self.NS+"group":
 		    if state_stack[-2] == self.NS+"groups":
 			self.drug_to_groups.setdefault(drug_id, set()).add(elem.text)
+		elif elem.tag == self.NS+"category":
+		    if state_stack[-2] == self.NS+"categories":
+			self.drug_to_categories.setdefault(drug_id, set()).add(elem.text)
+		elif elem.tag == self.NS+"atc-code":
+		    if state_stack[-2] == self.NS+"atc-codes":
+			self.drug_to_atc_codes.setdefault(drug_id, set()).add(elem.text)
 		elif elem.tag == self.NS+"drug":
 		    if len(state_stack) > 3 and state_stack[-3] == self.NS+"drug-interactions" and state_stack[-2] == self.NS+"drug-interaction":
 			d = self.drug_to_interactions.setdefault(drug_id, {})
@@ -125,6 +137,16 @@ class DrugBankXMLParser(object):
 		elif elem.tag == self.NS+"gene-name":
 		    if state_stack[-3] == self.NS+"partners" and state_stack[-2] == self.NS+"partner":
 			self.partner_id_to_gene[partner_id] = elem.text
+		elif elem.tag == self.NS+"kind":
+		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
+                        current_property = elem.text # InChIKey
+		elif elem.tag == self.NS+"value":
+		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
+                        if current_property == "InChIKey":
+                            inchi_key = elem.text # strip InChIKey=
+                            if inchi_key.startswith("InChIKey="):
+                                inchi_key = inchi_key[len("InChIKey="):]
+                            self.drug_to_inchi_key[drug_id] = inchi_key
 		elif elem.tag == self.NS+"resource":
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
 			resource = elem.text 

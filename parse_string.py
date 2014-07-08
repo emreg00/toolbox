@@ -5,11 +5,11 @@ def main():
     base_dir = "/home/emre/data/interactome/STRING9/"
     mapping_file = base_dir + "entrez_gene_id.vs.string.v9.0.28122012.txt"
     links_file = base_dir + "protein.links.v9.1.txt.gz"
-    output_file = base_dir + "network_500.txt"
-    get_interactions(links_file, mapping_file, output_file, cutoff = 500)
+    output_file = base_dir + "network_900.txt"
+    get_interactions(links_file, mapping_file, output_file, cutoff = 900, include_score=True)
     return
 
-def get_interactions(links_file, mapping_file, output_file, cutoff = 0, species_prefix = "9606"):
+def get_interactions(links_file, mapping_file, output_file, cutoff = 0, species_prefix = "9606", include_score=False):
     f = open(mapping_file)
     line = f.readline()
     id_to_geneid = {} 
@@ -36,7 +36,10 @@ def get_interactions(links_file, mapping_file, output_file, cutoff = 0, species_
 	if id1 not in id_to_geneid or id2 not in id_to_geneid:
 	    continue
 	if int(score) >= cutoff:
-	    f_out.write("%s\t%s\n" % (id_to_geneid[id1], id_to_geneid[id2]))
+	    if include_score:
+		f_out.write("%s\t%s\t%f\n" % (id_to_geneid[id1], id_to_geneid[id2], float(score)/1000))
+	    else:
+		f_out.write("%s\t%s\n" % (id_to_geneid[id1], id_to_geneid[id2]))
     f.close()
     f_out.close()
     return 
