@@ -12,12 +12,14 @@ def get_balanced_auc(predictions_true, predictions_false, replicable = None):
 	values_balanced_t = []
 	values_balanced_f = []
     else:
-        n_random = 100
+        n_random = 100 #!
 	values_balanced_t = None
 	values_balanced_f = None
         values = numpy.empty(n_random)
         for i in xrange(n_random):
-            predictions_t, predictions_f = balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable = replicable)
+            #predictions_t, predictions_f = balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable = replicable)
+            predictions_t, predictions_f = balance_predictions(predictions_true, predictions_false, n_random_negative_folds = 1, replicable = replicable) #!
+	    #predictions_t, predictions_f = predictions_true, [ numpy.mean(predictions_false) ] * len(predictions_false) #!
             values[i] = get_auc(predictions_t, predictions_f)
 	    if values_balanced_t is None or values_balanced_f is None:
 		values_balanced_t = numpy.array(predictions_t)
@@ -53,7 +55,7 @@ def balance_predictions(predictions_true, predictions_false, n_random_negative_f
 	predictions = predictions_true
 	predictions_true = predictions_false
 	predictions_false = predictions
-    negative_sample_size = len(predictions_true)
+    negative_sample_size = len(predictions_true) 
     negative_scores = [ 0.0 ] * negative_sample_size
     n_fold = 0
     for sample in generate_samples_from_list_without_replacement(predictions_false, negative_sample_size, n_random_negative_folds, replicable = replicable):

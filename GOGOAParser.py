@@ -48,11 +48,11 @@ class GOGOAParser(object):
 	    if len(words) < 13:
 		continue
 	    db_name, db_id, gene_name, qualifier, go_id, evidence_ref, evidence_type, evidence_id, aspect, description, synonym, type, taxon_id = words[:13] #, date, curator, extension, form_id
-	    
+    
 	    if exclude_evidences is not None and evidence_type in exclude_evidences:
 		continue
 
-	    if any([ q=="NOT" for q in qualifier.split('|')]):
+	    if any([ q=="NOT" for q in qualifier.split('|')]): # possible other qualifiers: colocalizes_with, contributes_to
 		continue
 
 	    if db_name not in self.db_name_to_biana_name:
