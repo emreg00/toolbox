@@ -1,3 +1,4 @@
+import numpy
 
 def main():
     base_dir = "/home/emre/arastirma/data/drug/cmap"
@@ -7,7 +8,7 @@ def main():
     drug_to_top_geneids = get_cmap_info(desc_file, probe_mapping_file, matrix_file)
     return
 
-def get_cmap_info(desc_file, probe_mapping_file, matrix_file):
+def get_cmap_info(desc_file, probe_mapping_file, matrix_file, n_top=250):
     # Get instance info
     f = open(desc_file)
     line = f.readline()
@@ -26,28 +27,29 @@ def get_cmap_info(desc_file, probe_mapping_file, matrix_file):
 	instance_to_values[instance] = (drug, concentration, duration, cell_type)
 	drug_to_instances.setdefault(drug, []).append(instance)
     f.close()
-    # Get instance with highest concentration & shortest duration
-    instance_to_drug = {}
-    for drug, instances in drug_to_instances.iteritems():
-	max_concentration = None
-	min_duration = None
-	selected_instance = None
-	for instance in instances:
-	    drug_, concentration, duration, cell_type = instance_to_values[instance]
-	    if max_concentration is None:
-		max_concentration = concentration
-	    if min_duration is None:
-		min_duration = duration
-	    if duration < min_duration:
-		min_duration = duration
-		selected_instance = instance
-	    elif duration == min_duration:
-		if concentration >= max_concentration:
+    if False:
+	# Get instance with highest concentration & shortest duration
+	instance_to_drug = {}
+	for drug, instances in drug_to_instances.iteritems():
+	    max_concentration = None
+	    min_duration = None
+	    selected_instance = None
+	    for instance in instances:
+		drug_, concentration, duration, cell_type = instance_to_values[instance]
+		if max_concentration is None:
 		    max_concentration = concentration
+		if min_duration is None:
+		    min_duration = duration
+		if duration < min_duration:
+		    min_duration = duration
 		    selected_instance = instance
-	if selected_instance is None:
-	    raise ValueError("None instance %s %s" % (drug, instances))
-	instance_to_drug[selected_instance] = drug
+		elif duration == min_duration:
+		    if concentration >= max_concentration:
+			max_concentration = concentration
+			selected_instance = instance
+	    if selected_instance is None:
+		raise ValueError("None instance %s %s" % (drug, instances))
+	    instance_to_drug[selected_instance] = drug
     # Get probe geneid mapping
     f = open(probe_mapping_file)
     line = f.readline()
@@ -61,14 +63,14 @@ def get_cmap_info(desc_file, probe_mapping_file, matrix_file):
     line = f.readline()
     words = line.strip().split("\t")
     #header_to_idx = dict((word.lower(), i) for i, word in enumerate(words))
-    header_values = words
+    header_values = words[1:]
     instance_to_ranks = {}
     geneids = []
     for line in f:
 	words = line.strip().split("\t")
 	probe = words[0]
 	if probe not in probe_to_geneid:
-	    geneid = "*%s" % probe
+	    geneid = probe #"*%s" % probe
 	else:
 	    geneid = probe_to_geneid[probe]
 	geneids.append(geneid)
@@ -77,31 +79,34 @@ def get_cmap_info(desc_file, probe_mapping_file, matrix_file):
     f.close()
     geneids = numpy.array(geneids)
     # Get top geneids for each instance
-    drug_to_top_geneids = {}
+    #drug_to_top_geneids = {}
+    drug_to_parameters_to_top_geneids = {}
     for instance, ranks in instance_to_ranks.iteritems():
-	if instance not in instance_to_drug:
-	    continue
+	#if instance not in instance_to_drug:
+	#    continue
 	indices = numpy.argsort(ranks)
 	up_geneids = []
 	down_geneids = []
-	i = 0
-	for geneid in geneids[indices][:250]:
-	    if i >= 50:
-		break
-	    if geneid[0] == "*":
-		continue
+	#i = 0 # to get 50 geneids
+	for geneid in geneids[indices][:n_top]:
+	    #if i >= 50:
+	    #	break
+	    #if geneid[0] == "*": # before storing *probeid as geneid
+	    #	continue
 	    up_geneids.append(geneid)
-	    i += 1
-	i = 0
-	for geneid in reversed(geneids[indices][-250:]):
-	    if i >= 50:
-		break
-	    if geneid[0] == "*":
-		continue
+	    #i += 1
+	#i = 0
+	for geneid in reversed(geneids[indices][-n_top:]):
+	    #if i >= 50:
+	    #	break
+	    #if geneid[0] == "*":
+	    #	continue
 	    down_geneids.append(geneid)
-	    i += 1
-	drug_to_top_geneids[instance_to_drug[instance]] = (up_geneids, down_geneids)
-    return drug_to_top_geneids
+	    #i += 1
+	#drug_to_top_geneids[instance_to_drug[instance]] = (up_geneids, down_geneids)
+	(drug, concentration, duration, cell_type) = instance_to_values[instance]
+	drug_to_parameters_to_top_geneids.setdefault(drug, {})[(concentration, duration, cell_type)] = (up_geneids, down_geneids)
+    return drug_to_parameters_to_top_geneids #drug_to_top_geneids
 
 
 if __name__ == "__main__":

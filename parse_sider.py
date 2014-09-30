@@ -1,13 +1,19 @@
+import TsvReader
+import os, cPickle
 
 def main():
     base_dir = "/home/emre/arastirma/data/drug/sider"
     label_file = base_dir + "label_mapping.tsv"
     side_effect_file = base_dir + "adverse_effects_raw.tsv" 
-    pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions = get_sider_info(label_file, side_effect_file)
+    dump_file = base_dir + "sider.pcl"
+    pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions = get_sider_info(label_file, side_effect_file, dump_file)
     return
 
 
-def get_sider_info(label_file, side_effect_file):
+def get_sider_info(label_file, side_effect_file, dump_file):
+    if os.path.exists(dump_file):
+	pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions = cPickle.load(open(dump_file))
+	return pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions
     parser = TsvReader.TsvReader(label_file, delim="\t", inner_delim=None)
     column_to_index, id_to_values = parser.read(fields_to_include=["Label", "Name", "Alternative name", "Marker", "CID flat", "CID specific", "URL"], keys_to_include=None, merge_inner_values=False)
     label_to_cids = {}
@@ -45,6 +51,7 @@ def get_sider_info(label_file, side_effect_file):
 	    siderids = pubchem_specific_to_siderids.setdefault(cid, set())
 	    if label in label_to_siderids:
 		siderids |= label_to_siderids[label]
+    cPickle.dump((pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions), open(dump_file, 'w'))
     return pubchem_to_siderids, pubchem_specific_to_siderids, siderid_to_descriptions
 
 

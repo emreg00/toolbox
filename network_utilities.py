@@ -441,7 +441,8 @@ def get_source_to_average_target_distance(sp, geneids_source, geneids_target, di
 	    elif distance == "kernel" or distance == "kernel-min":
 		val = -numpy.log(numpy.mean([numpy.exp(-value-1) for value in values])) 
             elif distance == "kernel2": 
-		val = 0.1/numpy.mean([numpy.exp(-value) for value in values])
+		#val = 0.1/numpy.mean([numpy.exp(-value) for value in values])
+		val = numpy.exp(numpy.mean(values))
 	    elif distance == "closest" or distance == "closest-min":
 		val = min(values)
 	    elif distance == "binary":
@@ -770,6 +771,8 @@ def get_separation(network, sp, targets, seeds, distance, parameters={}, averagi
 	    target_to_distance = get_source_to_average_target_overlap(network, targets, seeds, distance)
 	elif distance.startswith("mahalanobis"):
 	    target_to_distance, center_d = get_source_to_average_target_distance(sp, targets, seeds, distance, parameters = parameters)
+	elif distance == "tsesolc":
+	    target_to_distance = get_source_to_average_target_distance(sp, seeds, targets, "closest", parameters = parameters)
 	else:
 	    target_to_distance = get_source_to_average_target_distance(sp, targets, seeds, distance, parameters = parameters)
 	values = target_to_distance.values()

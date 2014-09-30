@@ -20,6 +20,7 @@ def main():
     score_drugs_by_target_score(drug_to_targets, scores_file, output_file)
     return
 
+
 class DrugBankXMLParser(object):
     NS="{http://drugbank.ca}"
 
@@ -39,10 +40,6 @@ class DrugBankXMLParser(object):
 	self.drug_to_targets_active = {}
 	self.partner_id_to_gene = {}
 	self.partner_id_to_uniprot = {}
-        self.drug_to_categories = {}
-        self.drug_to_atc_codes = {}
-        self.drug_to_inchi_key = {}
-        self.drug_to_smiles = {}
 	return
 
     def parse(self, selected_names=None, exp=None):
@@ -60,7 +57,6 @@ class DrugBankXMLParser(object):
 	drug_id_partner = None
 	partner_id = None
 	resource = None
-        current_property = None 
 	for (event, elem) in context:
 	    if event == "start":
 		state_stack.append(elem.tag)
@@ -68,9 +64,7 @@ class DrugBankXMLParser(object):
 		    if state_stack[-2] == self.NS+"partners":
 			partner_id = elem.attrib["id"]
 		elif elem.tag == self.NS+"resource":
-		    resource = None
-		elif elem.tag == self.NS+"property":
-                    current_property = None
+		    uniprot_resource = False
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
 			current_target = elem.attrib["partner"]
@@ -104,7 +98,8 @@ class DrugBankXMLParser(object):
 			    self.drug_to_synonyms.setdefault(drug_id, set()).add(synonym) 
 		if elem.tag == self.NS+"drugbank-id":
 		    if state_stack[-2] == self.NS+"drug":
-			drug_id = elem.text
+			if "primary" in elem.attrib:
+			    drug_id = elem.text
 		elif elem.tag == self.NS+"description":
 		    if state_stack[-2] == self.NS+"drug":
 			self.drug_to_description[drug_id] = elem.text
@@ -116,20 +111,16 @@ class DrugBankXMLParser(object):
 		elif elem.tag == self.NS+"target":
 		    if state_stack[-2] == self.NS+"targets":
 			#current_target = elem.attrib["partner"]
+			#! need to change
 			self.drug_to_partner_ids.setdefault(drug_id, []).append(current_target)
 		elif elem.tag == self.NS+"known-action":
 		    if state_stack[-2] == self.NS+"target":
 			if elem.text == "yes":
+			    #! 
 			    self.drug_to_partner_ids_active.setdefault(drug_id, set()).add(current_target)
 		elif elem.tag == self.NS+"group":
 		    if state_stack[-2] == self.NS+"groups":
 			self.drug_to_groups.setdefault(drug_id, set()).add(elem.text)
-		elif elem.tag == self.NS+"category":
-		    if state_stack[-2] == self.NS+"categories":
-			self.drug_to_categories.setdefault(drug_id, set()).add(elem.text)
-		elif elem.tag == self.NS+"atc-code":
-		    if state_stack[-2] == self.NS+"atc-codes":
-			self.drug_to_atc_codes.setdefault(drug_id, set()).add(elem.text)
 		elif elem.tag == self.NS+"drug":
 		    if len(state_stack) > 3 and state_stack[-3] == self.NS+"drug-interactions" and state_stack[-2] == self.NS+"drug-interaction":
 			d = self.drug_to_interactions.setdefault(drug_id, {})
@@ -137,19 +128,8 @@ class DrugBankXMLParser(object):
 			d[drug_id_partner] = ""
 		elif elem.tag == self.NS+"gene-name":
 		    if state_stack[-3] == self.NS+"partners" and state_stack[-2] == self.NS+"partner":
+			#!
 			self.partner_id_to_gene[partner_id] = elem.text
-		elif elem.tag == self.NS+"kind":
-		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
-                        current_property = elem.text # InChIKey or SMILES
-		elif elem.tag == self.NS+"value":
-		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
-                        if current_property == "InChIKey":
-                            inchi_key = elem.text # strip InChIKey=
-                            if inchi_key.startswith("InChIKey="):
-                                inchi_key = inchi_key[len("InChIKey="):]
-                            self.drug_to_inchi_key[drug_id] = inchi_key
-                        if current_property == "SMILES":
-                            self.drug_to_smiles[drug_id] = elem.text 
 		elif elem.tag == self.NS+"resource":
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
 			resource = elem.text 
@@ -157,6 +137,7 @@ class DrugBankXMLParser(object):
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
 			if state_stack[-5] == self.NS+"partners" and state_stack[-4] == self.NS+"partner":
 			    if resource == "UniProtKB":
+				#! 
 				self.partner_id_to_uniprot[partner_id] = elem.text
 			elif state_stack[-4] == self.NS+"drug":
 			    if resource == "PubChem Compound":
@@ -176,6 +157,7 @@ class DrugBankXMLParser(object):
 		if drug in self.drug_to_partner_ids_active and partner_id in self.drug_to_partner_ids_active[drug]:
 		    self.drug_to_targets_active.setdefault(drug, set()).add(uniprot)
 	return 
+
 
     def get_synonyms(self, selected_drugs=None):
 	name_to_drug = {}
@@ -234,21 +216,12 @@ def get_disease_specific_drugs(parser, selected_drugs, phenotypes):
 	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
 	    values = text_utilities.tokenize_disease_name(disease)
 	    #print disease, values
-	    indication_to_diseases.setdefault(indication, set())
 	    if all([ indication.find(word.strip()) != -1 for word in values ]):
 		#print disease, drug
 		disease_to_drugs.setdefault(disease, set()).add(drug)
 		indication_to_diseases.setdefault(indication, set()).add(disease)
 	    else:
-		values = text_utilities.tokenize_disease_name(disease.replace("2", "II"))
-		if all([ indication.find(word.strip()) != -1 for word in values ]):
-		    disease_to_drugs.setdefault(disease, set()).add(drug)
-		    indication_to_diseases.setdefault(indication, set()).add(disease)
-		else:
-		    values = text_utilities.tokenize_disease_name(disease.replace("1", "I"))
-		    if all([ indication.find(word.strip()) != -1 for word in values ]):
-			disease_to_drugs.setdefault(disease, set()).add(drug)
-			indication_to_diseases.setdefault(indication, set()).add(disease)
+		indication_to_diseases.setdefault(indication, set())
     # Print non-matching indications #!
     for indication, diseases in indication_to_diseases.iteritems():
 	if len(diseases) == 0:

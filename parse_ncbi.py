@@ -26,12 +26,11 @@ def get_geneid_symbol_mapping(file_name):
     return geneid_to_names, name_to_geneid
 
 
-def get_unigene_to_geneids(prefix="Hs."):
+def get_unigene_to_geneids(file_name, prefix = "Hs."):
     """
-    To parse gene2unigene from NCBI
+    To parse gene2unigene file from NCBI
     """
-    unigene_file = CONFIG.get("unigene_file") 
-    f = open(unigene_file)
+    f = open(file_name)
     unigene_to_geneids = {}
     f.readline()
     for line in f:
@@ -45,6 +44,19 @@ def get_unigene_to_geneids(prefix="Hs."):
     return unigene_to_geneids
 
 
+def get_geneid_to_pubmeds(file_name, tax_id = "9606"):
+    """
+    To parse gene2pubmed file from NCBI 
+    """
+    f = open(file_name)
+    geneid_to_pubmeds = {}
+    f.readline()
+    for line in f:
+	tax, geneid, pubmed_id = line.strip().split("\t")
+	if tax != tax_id:
+	    continue
+	geneid_to_pubmeds.setdefault(geneid, set()).add(pubmed_id)
+    return geneid_to_pubmeds
 
 
  

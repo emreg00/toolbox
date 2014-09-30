@@ -1,7 +1,6 @@
 import urllib
 import urllib2
 from bs4 import BeautifulSoup
-from diseasome.src import diseasome
 
 # Taken from Durek and Walter http://www.biomedcentral.com/1752-0509/2/100
 CURRENCY_METABOLITES = set(["C00001", "C00002", "C00003", "C00004", "C00005", "C00006", "C00007", "C00008", "C00009", "C00010", "C00011", "C00013", "C00014", "C00015", "C00016", "C00018", "C00019", "C00020", "C00021", "C00023", "C00027", "C00028", "C00030", "C00034", "C00035", "C00038", "C00044", "C00050", "C00055", "C00061", "C00063", "C00070", "C00075", "C00076", "C00080", "C00105", "C00112", "C00113", "C00115", "C00120", "C00125", "C00126", "C00138", "C00139", "C00144", "C00175", "C00194", "C00205", "C00238", "C00291", "C01352"])
@@ -52,12 +51,25 @@ def output_interactions(out_file):
 
 
 def get_data(command, parameter):
+    """
+        get drug / disease: get/dr:D00001 or get/ds:H00001
+        get all drug-disease links: link/drug/disease
+        get all diseases: list/disease
+    """
     url = 'http://rest.kegg.jp/%s/%s' % (command, parameter) #list/reaction
     req = urllib2.Request(url)
     response = urllib2.urlopen(req)
     for line in response:
         yield line
 
+
+def get_drug_disease_mapping():
+    # get all diseases
+    # get their ds - mesh mapping (one by one)
+    # get their linked drugs (all vs all)
+    # get drug's drugbank id (one by one)
+    raise ValueError("Not implemented!")
+    return
 
 def get_reactions():
     reactions = []

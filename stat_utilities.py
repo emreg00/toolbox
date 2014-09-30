@@ -73,7 +73,7 @@ def correlation(x, y, cor_type="pearson"):
     if cor_type == "pearson":
 	coef, pval = np.ravel(stats.pearsonr(x, y))
     elif cor_type == "spearman":
-	coef, pval = np.ravel(stats.spearmanr(x, y))[0]
+	coef, pval = np.ravel(stats.spearmanr(x, y))
     else:
 	raise ValueError("Invalid correlation type!")
     return coef, pval
