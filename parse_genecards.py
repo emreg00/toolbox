@@ -3,6 +3,10 @@ import urllib2
 from bs4 import BeautifulSoup
 from diseasome.src import diseasome
 
+#!
+#! Potential bug in fetching gene info from genecards, not all genes are parsed
+#!
+
 def main():
     base_dir = "/home/emre/data/disease/genecards"
     file_name = base_dir + "/download.html"

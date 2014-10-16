@@ -118,6 +118,7 @@ def statistical_test(x, y, test_type="wilcoxon", alternative="two-sided"):
 	raise ValueError("Not implemented!")
     return stat, pval
 
+
 def hypergeometric_test(picked_good, picked_all, all_all, all_good):
     k = len(picked_good) 
     M = len(all_all) 
@@ -125,6 +126,12 @@ def hypergeometric_test(picked_good, picked_all, all_all, all_good):
     N = len(picked_all) 
     val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
     return val
+
+
+def hypergeometric_test_numeric(k, n, N, M):
+    val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
+    return val
+
 
 def density_estimation(occurences, possible_values):
     kde = stats.gaussian_kde(map(float, occurences))
