@@ -1,7 +1,10 @@
 import urllib2, os, cPickle, json
 from stat_utilities import calc_mean_and_sigma
+import configuration
 
-API_USER_KEY = None # change this value with custom API key
+CONFIG = configuration.Configuration() 
+
+API_USER_KEY = CONFIG.get("FDA_API_KEY") #None # change this value with custom API key
 LIMIT = 100
 FIELD_DRUG = "patient.drug.medicinalproduct"
 FIELD_DISEASE = "patient.drug.drugindication"
@@ -15,10 +18,13 @@ def main():
     #disease = "type 2 diabetes"
     #disease = "alzheimer"
     #disease = "asthma"
-    disease = "acute lymphocytic leukaemia"
-    condition="drug ineffective"
+    #disease = "acute lymphocytic leukaemia"
+    disease = "rheumatoid arthritis"
+    #disease = "bone sarcoma"
+    condition = None #"drug ineffective"
     print get_counts_for_drug(drug, disease, condition)
-    #print get_counts_from_date(drug, disease, condition)
+    #d = get_counts_from_data(drug, disease, condition)
+    #print d, len(d)
     values, values_eff = get_drug_treatment(drug, disease)
     print map(lambda x: "%.2f(%d) %s" % x, values[:5])
     print values_eff
@@ -70,7 +76,7 @@ def get_data(command, parameter, parameter2=None, parameter_effect=None):
     result = []
     while True:
 	result2 = get_data_helper(command, parameter, parameter2, parameter_effect, skip=offset)
-	#print offset, len(result2["results"])
+	print offset, len(result2["results"])
 	result += result2["results"]
 	offset += limit
 	if len(result2["results"]) < limit:
@@ -78,7 +84,20 @@ def get_data(command, parameter, parameter2=None, parameter_effect=None):
     return result
 
 
-def get_counts_from_date(drug, disease, condition):
+def get_counts_from_data(drug, disease, condition=None):
+    if condition is None:
+	condition_to_count = {}
+	values = get_data("drug-disease", drug, disease)
+	flag_drug = False
+	flag_disease = False
+	for row in values:
+	    for row_inner in row["patient"]["reaction"]:
+		if "reactionmeddrapt" not in row_inner:
+		    continue
+		condition = row_inner["reactionmeddrapt"].lower()
+		i = condition_to_count.setdefault(condition, 0)
+		condition_to_count[condition] = i + 1
+	return condition_to_count
     values = get_data("drug-disease-effect", drug, disease, condition)
     i = 0
     flag_drug = False
@@ -94,6 +113,8 @@ def get_counts_from_date(drug, disease, condition):
 			flag_disease = True
 			#print row_inner["drugindication"]
 	for row_inner in row["patient"]["reaction"]:
+	    if "reactionmeddrapt" not in row_inner:
+		continue
 	    if row_inner["reactionmeddrapt"].lower() == condition:
 		if flag_drug and flag_disease:
 		    i += 1
@@ -103,34 +124,38 @@ def get_counts_from_date(drug, disease, condition):
 
 def get_counts(command, parameter, parameter2=None, parameter_effect=None):
     parameter = parameter.replace(" ", "+")
+    if parameter2 is not None:
+        parameter2 = parameter2.replace(" ", "+")
+    if parameter_effect is not None:
+        parameter_effect = parameter_effect.replace(" ", "+")
     if command == "drug": # number of safety reports for that drug
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DRUG)
     elif command == "disease": # number of safety reports for that disease
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DISEASE, parameter, FIELD_DISEASE)
     elif command == "drug-disease": # number of safety reports for that drug and disease pair
 	assert parameter2 is not None
-        parameter2 = parameter2.replace(" ", "+")
 	txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_DRUG)
     elif command == "disease-drug":
 	assert parameter2 is not None
-        parameter2 = parameter2.replace(" ", "+")
-        txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DISEASE, parameter, FIELD_DRUG, parameter2, FIELD_DISEASE)
+        txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DISEASE, parameter2, FIELD_DRUG, parameter, FIELD_DISEASE)
     elif command == "drug-effect": # number of safety reports for that drug and reaction pair
 	assert parameter_effect is not None
-        parameter_effect = parameter_effect.replace(" ", "+")
 	txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_EFFECT, parameter_effect, FIELD_DRUG)
-    elif command == "drug-disease-effect": # number of safety reports for that drug, disease and reaction triple
+    elif command == "disease-effect": # number of safety reports for that disease and reaction pair
+	assert parameter_effect is not None
+	txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DISEASE, parameter, FIELD_EFFECT, parameter_effect, FIELD_DISEASE)
+    elif command == "drug-disease-effect" or command == "disease-drug-effect": # number of safety reports for that drug, disease and reaction triple
 	assert (parameter2 is not None and parameter_effect is not None)
-        parameter2 = parameter2.replace(" ", "+")
-        parameter_effect = parameter_effect.replace(" ", "+")
-        txt = '%s:"%s"+AND+%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect, FIELD_DRUG)
+	if command == "drug-disease-effect":
+	    txt = '%s:"%s"+AND+%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect, FIELD_DRUG)
+	elif command == "disease-drug-effect":
+	    txt = '%s:"%s"+AND+%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect, FIELD_DISEASE)
     elif command == "drug-disease2": # returns all diseases
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE)
     elif command == "disease-drug2": # returns all drugs
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DISEASE, parameter, FIELD_DRUG)
     elif command == "drug-disease-effect2": # returns all reactions and their counts
 	assert parameter2 is not None
-        parameter2 = parameter2.replace(" ", "+")
         txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT)
     else:
         raise ValueError("Unknown command: " + command)
@@ -139,8 +164,17 @@ def get_counts(command, parameter, parameter2=None, parameter_effect=None):
     else:
         url = 'https://api.fda.gov/drug/event.json?api_key=%s&search=%s&limit=%d' % (API_USER_KEY, txt, 10*LIMIT)
     #print url
+    n = None
     req = urllib2.Request(url)
-    response = urllib2.urlopen(req)
+    try:
+	response = urllib2.urlopen(req)
+    except urllib2.HTTPError:
+	if parameter_effect is not None:
+	    n = 0
+	print "No info for", parameter, parameter2, parameter_effect
+	if parameter2 is not None or parameter_effect is not None:
+	    print url
+        return n
     while True:
 	try:
 	    response = json.load(response)
@@ -150,13 +184,25 @@ def get_counts(command, parameter, parameter2=None, parameter_effect=None):
 	    response = urllib2.urlopen(req)
     if command.endswith("2"):
 	return response["results"]
-    row = response["results"][0]
-    assert row["term"].lower() == parameter.lower()
-    n = int(row["count"])
+    val = parameter.lower().replace("+", " ")
+    if command in ("disease-drug", "disease-drug-effect"):
+	val = parameter2.lower().replace("+", " ")
+    for row in response["results"]:
+	# note that 's are ^s in the results
+	if row["term"].lower().find(val) != -1:
+	    #print row["term"].lower()
+	    n = int(row["count"])
+	    break
     return n
 
 
 def z_scorize_counts(count_term_pairs):
+    #values = []
+    #for count, term in count_term_pairs:
+    #	if count < 2: 
+    #	    continue
+    #	values.append((count, term))
+    #count_term_pairs = values
     values = []
     m, s = calc_mean_and_sigma(zip(*count_term_pairs)[0])
     for count, term in count_term_pairs:
@@ -198,12 +244,26 @@ def get_counts_for_drug(drug, disease=None, condition=None):
     return N, n, M, k
 
 
+def get_counts_for_disease(drug, disease=None, condition=None):
+    command = "disease"
+    N = get_counts(command, disease)
+    n, k, M = None, None, None
+    if disease is not None:
+	command = "drug-disease" #"disease-drug"
+	n = get_counts(command, drug, disease)
+	if condition is not None:
+	    command = "drug-disease-effect" #"disease-drug-effect"
+	    k = get_counts(command, drug, disease, condition)
+    if condition is not None:
+	command = "disease-effect"
+	M = get_counts(command, disease, None, condition)
+    return N, n, M, k
+
+
 def get_drug_treatment(drug, disease):
-    try:
-        response = get_counts("drug-disease-effect2", drug, disease)
-    except urllib2.HTTPError:
-        print "No info for", drug, disease
-        return [], []
+    response = get_counts("drug-disease-effect2", drug, disease)
+    if response is None:
+	return None, None
     values = []
     for row in response:
         #indication = row["patient"]["drug"]["drugindication"]

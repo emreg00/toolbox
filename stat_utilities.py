@@ -121,15 +121,20 @@ def statistical_test(x, y, test_type="wilcoxon", alternative="two-sided"):
 
 def hypergeometric_test(picked_good, picked_all, all_all, all_good):
     k = len(picked_good) 
-    M = len(all_all) 
-    n = len(all_good) 
-    N = len(picked_all) 
-    val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
+    N = len(all_all) 
+    M = len(all_good) 
+    n = len(picked_all) 
+    val = sum(stats.hypergeom.pmf(range(k, min(n, M)+1), N, M, n))
+    # in stats doc M is N, n is M, N is n
+    #M = len(all_all) 
+    #n = len(all_good) 
+    #N = len(picked_all) 
+    #val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
     return val
 
 
 def hypergeometric_test_numeric(k, n, N, M):
-    val = sum(stats.hypergeom.pmf(range(k,min(N,n)+1), M, n, N))
+    val = sum(stats.hypergeom.pmf(range(k, min(n, M)+1), N, M, n))
     return val
 
 
