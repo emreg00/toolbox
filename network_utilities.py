@@ -34,7 +34,7 @@ import os, cPickle, numpy
 try:
     from scipy.stats import rankdata
 except:
-    print "SCIPY is not intalled, rank-based distance methods wont work"
+    print "SCIPY is not installed, rank-based distance methods wont work"
 
 #MIN_NUMBER_OF_PERTURBATION = 25
 MAX_NUMBER_OF_TRIAL = 10

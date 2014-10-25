@@ -260,6 +260,16 @@ def get_counts_for_disease(drug, disease=None, condition=None):
     return N, n, M, k
 
 
+def get_counts_for_drug_and_disease(drug, disease, condition=None):
+    n, k = None, None
+    command = "disease-drug"
+    n = get_counts(command, drug, disease)
+    if condition is not None:
+	command = "disease-drug-effect"
+	k = get_counts(command, drug, disease, condition)
+    return n, k
+
+
 def get_drug_treatment(drug, disease):
     response = get_counts("drug-disease-effect2", drug, disease)
     if response is None:
