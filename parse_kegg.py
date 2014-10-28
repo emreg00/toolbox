@@ -1,7 +1,7 @@
 import urllib
 import urllib2
 from bs4 import BeautifulSoup
-import cPickle
+import cPickle, os
 
 # Taken from Durek and Walter http://www.biomedcentral.com/1752-0509/2/100
 CURRENCY_METABOLITES = set(["C00001", "C00002", "C00003", "C00004", "C00005", "C00006", "C00007", "C00008", "C00009", "C00010", "C00011", "C00013", "C00014", "C00015", "C00016", "C00018", "C00019", "C00020", "C00021", "C00023", "C00027", "C00028", "C00030", "C00034", "C00035", "C00038", "C00044", "C00050", "C00055", "C00061", "C00063", "C00070", "C00075", "C00076", "C00080", "C00105", "C00112", "C00113", "C00115", "C00120", "C00125", "C00126", "C00138", "C00139", "C00144", "C00175", "C00194", "C00205", "C00238", "C00291", "C01352"])
@@ -13,18 +13,31 @@ def main():
     #print get_disease_info("H00021")
     #print get_disease_info("H00410")
     #print get_drug_disease_mapping(["D06402"])
+    print get_compound_info("C13736")
     return
+
+
+def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
+    disease_to_drugs = {}
+    mesh_id_to_phenotype = {}
+    for phenotype, mesh_id in phenotype_to_mesh_id.items():
+        mesh_id_to_phenotype[mesh_id] = phenotype
+    for drugbank_id, diseases in drug_to_diseases.iteritems():
+	for disease, dui, val in diseases:
+	    if dui in mesh_id_to_phenotype: # In the disease data set
+		disease = mesh_id_to_phenotype[dui].lower()
+                disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
+    return disease_to_drugs
 
 
 def get_drug_disease_mapping(drugbank_to_kegg_id, dump_file):
     if os.path.exists(dump_file):
 	drug_to_diseases = cPickle.load(open(dump_file))
 	return drug_to_diseases 
-    #! Get kegg_ids in drugbank parser
     #kegg_ids if multiple keggs reduce(lambda x,y: x | y, drugbank_to_kegg_id.values())
     kegg_ids = set(drugbank_to_kegg_id.values()) 
     kegg_drug_to_phenotype_and_mesh_ids = get_kegg_drug_mesh_mapping(kegg_ids)
-    drug_to_diseases = {} # (mesh_id, mesh_term, may_treat) 
+    drug_to_diseases = {} # (kegg_term, mesh_id, 1) 
     #flag = False
     for drugbank_id, kegg_id in drugbank_to_kegg_id.iteritems():
 	#if drugbank_id == "DB04575":
@@ -41,9 +54,7 @@ def get_drug_disease_mapping(drugbank_to_kegg_id, dump_file):
             val = 1
 	    drug_to_diseases.setdefault(drugbank_id, []).append((disease, dui, val))
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
-    raise ValueError("Not implemented!")
-    return
-
+    return drug_to_diseases 
 
 
 def get_data(command, parameter, parameter2=None):
@@ -100,7 +111,7 @@ def get_kegg_drug_mesh_mapping(kegg_ids = None):
 
 
 def get_disease_info(kegg_disease):
-    mesh_ids = None
+    mesh_ids = set()
     flag = False
     for line in get_data("get", kegg_disease):
         if line.startswith("NAME"):
@@ -126,6 +137,29 @@ def get_disease_info(kegg_disease):
         if db == "MeSH:":
             mesh_ids = set(terms)
     return phenotype, mesh_ids
+
+
+def get_compound_info(kegg_compound):
+    kegg_ids = set()
+    flag = False
+    for line in get_data("get", kegg_compound):
+        if line.startswith("NAME"):
+            name = " ".join(line.strip("\n").split()[1:])
+            continue
+        elif line.startswith("REMARK"):
+            flag = True
+        elif not line.startswith(" "):
+            flag = False
+            continue
+        else:
+            if flag == False:
+                continue
+        #print line,
+        idx = line.strip("\n").find("Same as:")
+        if idx != -1:
+            terms = line[idx+len("Same as:"):].split()
+            kegg_ids = set(terms)
+    return name, kegg_ids
 
 
 def output_interactions(out_file):

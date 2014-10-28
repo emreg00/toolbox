@@ -35,6 +35,8 @@ class DrugBankXMLParser(object):
 	self.drug_to_partner_ids = {}
 	self.drug_to_partner_ids_active = {}
 	self.drug_to_pubchem = {}
+	self.drug_to_kegg = {}
+	self.drug_to_kegg_compound = {}
 	self.drug_to_targets = {}
 	self.drug_to_targets_active = {}
 	self.partner_id_to_gene = {}
@@ -161,6 +163,10 @@ class DrugBankXMLParser(object):
 			elif state_stack[-4] == self.NS+"drug":
 			    if resource == "PubChem Compound":
 				self.drug_to_pubchem[drug_id] = elem.text
+			    elif resource == "KEGG Drug":
+				self.drug_to_kegg[drug_id] = elem.text
+			    elif resource == "KEGG Compound":
+				self.drug_to_kegg_compound[drug_id] = elem.text
 		elem.clear()
 		state_stack.pop()
 	root.clear()

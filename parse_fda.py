@@ -1,4 +1,4 @@
-import urllib2, os, cPickle, json
+import urllib2, os, cPickle, json, re
 from stat_utilities import calc_mean_and_sigma
 import configuration
 
@@ -35,20 +35,75 @@ def main():
     return
 
 
+def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
+    disease_to_drugs = {}
+    mesh_id_to_phenotype = {}
+    for phenotype, mesh_id in phenotype_to_mesh_id.items():
+        mesh_id_to_phenotype[mesh_id] = phenotype
+    for drugbank_id, diseases in drug_to_diseases.iteritems():
+	for disease, dui, val in diseases:
+	    if dui in mesh_id_to_phenotype: # In the disease data set
+		disease = mesh_id_to_phenotype[dui].lower()
+                disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
+    return disease_to_drugs
+
+
+def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mesh_id_to_name, dump_file):
+    if os.path.exists(dump_file):
+	drug_to_diseases = cPickle.load(open(dump_file))
+	return drug_to_diseases 
+    drug_to_diseases = {} # (mesh_id, mesh_term, n, n_max, ri) 
+    exp = re.compile("-\d-")
+    #flag = False
+    for drugbank_id in selected_drugs:
+	#if drugbank_id == "DB04575":
+	#    flag = True
+	#if flag == False: 
+	#    continue
+	names = [ drug_to_name[drugbank_id] ]
+	for synonym in drug_to_synonyms[drugbank_id]:
+	    if synonym.find("[") != -1 or synonym.find("{") != -1:
+		continue
+	    m = exp.search(synonym)
+	    if m:
+		continue
+	    names.append(synonym)
+	drug = choose_fda_drug_name(names)
+	#! get diseases
+	values = get_diseases_for_drug(drug)
+	#!
+	#! get efficacy for each disease
+	values, values_eff = get_drug_treatment(drug, disease)
+	print drugbank_id, drug
+	if values is None or len(values) == 0:
+	    continue
+        #!f = open(dump_file + ".txt", 'a')
+	#f.write("%s\t%s\t%s\t%e\n" % (drugbank_id, phenotype, dui, q_value))
+        #f.close()
+	for disease, dui, val in values: #!
+	    disease = disease.lower()
+	    drug_to_diseases.setdefault(drugbank_id, []).append((disease, dui, val))
+    #!for line in open(dump_file + ".txt"):
+    #    (drugbank_id, phenotype, dui, q_value) = line.strip().split("\t")
+    #    drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, q_value))
+    cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
+    return drug_to_diseases
+
+
 def get_data_helper(command, parameter, parameter2=None, parameter_effect=None, skip=0):
-    parameter = parameter.replace(" ", "+")
+    parameter = parameter.replace(" ", "+").replace("-", "+")
     if command == "drug":
         txt = '%s:"%s"' % (FIELD_DRUG, parameter)
     elif command == "disease":
         txt = '%s:"%s"' % (FIELD_DISEASE, parameter)
     elif command == "drug-disease":
 	assert parameter2 is not None
-	parameter2 = parameter2.replace(" ", "+")
+	parameter2 = parameter2.replace(" ", "+").replace("-", "+")
 	txt = '%s:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2)
     elif command == "drug-disease-effect":
 	assert (parameter2 is not None and parameter_effect is not None)
-	parameter2 = parameter2.replace(" ", "+")
-	parameter_effect = parameter_effect.replace(" ", "+")
+	parameter2 = parameter2.replace(" ", "+").replace("-", "+")
+	parameter_effect = parameter_effect.replace(" ", "+").replace("-", "+")
 	txt = '%s:"%s"+AND+%s:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect)
     else:
         raise ValueError("Unknown command: " + command)
@@ -82,6 +137,27 @@ def get_data(command, parameter, parameter2=None, parameter_effect=None):
 	if len(result2["results"]) < limit:
 	    break
     return result
+
+
+def choose_fda_drug_name(names):
+    values = []
+    for name in names:
+        name = name.lower()
+        #if name.startswith("vitamin"):
+        #    name = name.replace(" ", "+")
+        #else:
+        #    words = name.split(" ")
+        #    if len(words) > 1: 
+        #        #print "Chopping drug name", name
+        #        name = words[0]
+        #    if name in ("compound", "dr.", "salicylate", "sodium"):
+        #        continue
+        N, n, M, k = parse_fda.get_counts_for_drug(name, None, None)
+        time.sleep(0.3) # 240 request / min limit
+        values.append((N, name))
+    values.sort()
+    name = values[-1][1]
+    return name
 
 
 def get_counts_from_data(drug, disease, condition=None):
@@ -123,11 +199,13 @@ def get_counts_from_data(drug, disease, condition=None):
 
 
 def get_counts(command, parameter, parameter2=None, parameter_effect=None):
-    parameter = parameter.replace(" ", "+")
+    prameter_org = parameter
+    parameter = parameter.replace(" ", "+").replace("-", "+")
     if parameter2 is not None:
-        parameter2 = parameter2.replace(" ", "+")
+	prameter2_org = parameter2
+        parameter2 = parameter2.replace(" ", "+").replace("-", "+")
     if parameter_effect is not None:
-        parameter_effect = parameter_effect.replace(" ", "+")
+        parameter_effect = parameter_effect.replace(" ", "+").replace("-", "+")
     if command == "drug": # number of safety reports for that drug
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DRUG)
     elif command == "disease": # number of safety reports for that disease
@@ -184,9 +262,9 @@ def get_counts(command, parameter, parameter2=None, parameter_effect=None):
 	    response = urllib2.urlopen(req)
     if command.endswith("2"):
 	return response["results"]
-    val = parameter.lower().replace("+", " ")
+    val = parameter_org.lower() #parameter.lower().replace("+", " ")
     if command in ("disease-drug", "disease-drug-effect"):
-	val = parameter2.lower().replace("+", " ")
+	val = parameter2_org.lower() #parameter2.lower().replace("+", " ")
     for row in response["results"]:
 	# note that 's are ^s in the results
 	if row["term"].lower().find(val) != -1:

@@ -26,10 +26,11 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id, cutoff_qv
     return disease_to_drugs
 
 
-def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mesh_ids, dump_file):
+def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mesh_id_to_name, dump_file):
     if os.path.exists(dump_file):
     	drug_to_diseases = cPickle.load(open(dump_file))
     	return drug_to_diseases 
+    mesh_ids = set(mesh_id_to_name.keys())
     drug_to_diseases = {}
     #flag = False
     for drugbank_id in selected_drugs:
