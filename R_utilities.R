@@ -624,20 +624,6 @@ normalizeArrays<-function(expr.file, expr.val.file, tf.file, merged.file, merged
     write.table(merged.norm.tf, merged.norm.tf.file)
 }
 
-convertProbetoGeneExpression<-function(expr.file, tf.file, expr.gene.file, expr.tf.file) {
-    expr<-read.table(expr.file, header=T)
-    gene.levels<-factor(expr$NAME)
-    averageProbesOfGenes<-function(asample){ 
-       return(tapply(asample,gene.levels,mean)) 
-    }
-    expr.gene<-apply(expr[3:dim(expr)[2]], 2, averageProbesOfGenes)
-    write.table(expr.gene, expr.gene.file, quote=F)
-    tfs<-read.table(tf.file)
-    expr.tf<-expr.gene[rownames(expr.gene) %in% levels(tfs[,1]),]
-    write.table(expr.tf, expr.tf.file, quote=F)
-}
-
-
 
 main()
 

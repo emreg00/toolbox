@@ -6,7 +6,8 @@ def convert_to_R_string(txt, mapping=[(" ", "."), (",", ""), ("'", "")]):
     return txt
 
 
-def tokenize_disease_name(disease):
+def tokenize_disease_name(disease, exact=True):
+    disease = disease.lower()
     disease_mod = disease.replace(" and ", ", ")
     disease_mod = disease.replace("-", ", ")
     phrases = disease_mod.split(",")
@@ -15,7 +16,7 @@ def tokenize_disease_name(disease):
 	inner_values = []
 	words = phrase.strip().split()
 	for i, token in enumerate(words):
-	    if token.endswith("'s"):
+	    if token.endswith("'s") or token.endswith("^s") :
 		token = token[:-2]
 	    if i == len(words) - 1:
 		if token[-1] == "s":
@@ -23,7 +24,10 @@ def tokenize_disease_name(disease):
 	    if token in ("disease", "disorder", "syndrome"):
 		continue
 	    inner_values.append(token)
-	values.append(" ".join(inner_values))
+	if exact:
+	    values.append(" ".join(inner_values))
+	else:
+	    values += inner_values
     return values
 
 

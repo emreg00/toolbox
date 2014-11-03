@@ -1,10 +1,13 @@
-import urllib2, os, cPickle, json, re
-from stat_utilities import calc_mean_and_sigma
-import configuration
+import urllib2, os, cPickle, json, re, time
+import configuration, text_utilities, stat_utilities 
 
 CONFIG = configuration.Configuration() 
 
-API_USER_KEY = CONFIG.get("FDA_API_KEY") #None # change this value with custom API key
+try:
+    API_USER_KEY = CONFIG.get("FDA_API_KEY") # change this value with custom API key
+except:
+    print "API key not found!"
+    API_USER_KEY = None
 LIMIT = 100
 FIELD_DRUG = "patient.drug.medicinalproduct"
 FIELD_DISEASE = "patient.drug.drugindication"
@@ -15,13 +18,16 @@ def main():
     #drug = "vitamin e" # "vit. e"
     #drug = "donepezil"
     drug = "methotrexate"
-    #disease = "type 2 diabetes"
+    disease = "type 2 diabetes"
     #disease = "alzheimer"
     #disease = "asthma"
     #disease = "acute lymphocytic leukaemia"
-    disease = "rheumatoid arthritis"
+    #disease = "rheumatoid arthritis"
     #disease = "bone sarcoma"
     condition = None #"drug ineffective"
+    mesh_names = [ "Diabetes Mellitus, Type 2", "Osteopenia", "Bone Diseases, Metabolic", "Pulmonary Disease, Chronic Obstructive"]
+    print convert_fda_name_to_mesh(disease, mesh_names)
+    return
     print get_counts_for_drug(drug, disease, condition)
     #d = get_counts_from_data(drug, disease, condition)
     #print d, len(d)
@@ -55,6 +61,10 @@ def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mes
     drug_to_diseases = {} # (mesh_id, mesh_term, n, n_max, ri) 
     exp = re.compile("-\d-")
     #flag = False
+    mesh_name_to_ids = {}
+    for mesh_id, names in mesh_id_to_name.iteritems():
+        for name in names:
+            mesh_name_to_ids.setdefault(name, set()).add(mesh_id)
     for drugbank_id in selected_drugs:
 	#if drugbank_id == "DB04575":
 	#    flag = True
@@ -69,25 +79,96 @@ def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mes
 		continue
 	    names.append(synonym)
 	drug = choose_fda_drug_name(names)
-	#! get diseases
-	values = get_diseases_for_drug(drug)
-	#!
-	#! get efficacy for each disease
-	values, values_eff = get_drug_treatment(drug, disease)
 	print drugbank_id, drug
-	if values is None or len(values) == 0:
-	    continue
-        #!f = open(dump_file + ".txt", 'a')
-	#f.write("%s\t%s\t%s\t%e\n" % (drugbank_id, phenotype, dui, q_value))
-        #f.close()
-	for disease, dui, val in values: #!
-	    disease = disease.lower()
-	    drug_to_diseases.setdefault(drugbank_id, []).append((disease, dui, val))
-    #!for line in open(dump_file + ".txt"):
-    #    (drugbank_id, phenotype, dui, q_value) = line.strip().split("\t")
-    #    drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, q_value))
+	# Get diseases
+	diseases = get_diseases_for_drug(drug)
+        if len(diseases) == 0:
+            continue
+        f = open(dump_file + ".txt", 'a')
+        not_found_in_mesh = set()
+        for n, disease in diseases:
+            phenotype = convert_fda_name_to_mesh(disease, mesh_name_to_ids.keys())
+            if phenotype is None:
+                not_found_in_mesh.add(disease)
+                continue
+            # Get efficacy for each disease
+            values, values_eff = get_drug_treatment(drug, disease)
+            if values is None or len(values) == 0:
+                continue
+            z_max, count_max, term = values[0]
+            z_ineff, count_ineff, z_adverse, count_adverse = values_eff
+            print disease, phenotype, n, count_max, count_ineff, count_adverse
+            f.write("%s\t%s\t%s\t%s\t%s\t%s\n" % (drugbank_id, drug_to_name[drugbank_id], drug, disease, phenotype, ",".join(mesh_name_to_ids[phenotype])))
+        f.close()
+            #! for dui in mesh_name_to_ids[phenotype]:
+            #!    drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, n, count_max, count_ineff, count_adverse))
+    print "Not found in MeSH:", not_found_in_mesh
+    for line in open(dump_file + ".txt"):
+        (drugbank_id, phenotype, dui, n, count_max, count_ineff, count_adverse) = line.strip().split("\t")
+        for mesh_id in dui.split(","):
+            drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, mesh_id, n, count_max, count_ineff, count_adverse))
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases
+
+
+def convert_mesh_name_to_fda_name(disease):
+    disease_to_term = { "arrhythmias, cardiac": "arrhythmia", "colitis, ulcerative": "colitis ulcerative", "lung diseases, obstructive": "chronic obstructive pulmonary disease", "sarcoma": "bone sarcoma", "liver cirrhosis": "hepatic cirrhosis", "liver cirrhosis, biliary": "biliary cirrhosis primary", "anemia, hemolytic": "anemia", "coronary artery disease": "coronary artery disease", "varicose veins": "varicose vein", "blood coagulation disorders": "disseminated intravascular coagulation", "mycobacterium infections": "mycobacterium avium complex infection" } 
+    if disease in disease_to_term:
+        disease_mod = disease_to_term[disease] 
+    # Chop "disease" (alzheimer, crohn),
+    elif disease.endswith(" disease"):
+        disease_mod = disease[:-len(" disease")]
+    # Replace "neoplasms" with "cancer"
+    elif disease.endswith(" neoplasms"):
+        disease_mod = disease[:-len(" neoplasms")]
+        disease_mod += " cancer"
+    # Get rid of the "s" for disorders / diseases
+    elif disease.endswith(" disorders"):
+        disease_mod = disease[:-1]
+    elif disease.endswith(" diseases"):
+        disease_mod = disease[:-1]
+    # Reverse the order for "," ("diabetes mellitus, type 2", "type 2 diabetes mellitus") 
+    elif "," in disease:
+        words = disease.split(", ")
+        words.reverse()
+        disease_mod = " ".join(words)
+    else:
+        disease_mod = disease.lower()
+    return disease_mod
+
+
+def convert_fda_name_to_mesh(disease, mesh_names):
+    # Get words skipping disease / disorder / syndrome / plural / 's
+    disease = disease.lower()
+    values = text_utilities.tokenize_disease_name(disease, exact=False)
+    #values_mod = []
+    #for word in values:
+        #if word == "neoplasm":
+        #    word = "cancer"
+        #elif word == "ii":
+        #    word = "2"
+        #elif word == "i":
+        #    word = "1"
+    #    values_mod.append(word)
+    phenotype = None
+    val_and_phenotypes = []
+    for mesh_name in mesh_names:
+        try: #!
+            mesh_name = mesh_name.decode('utf-8','ignore')
+        except:
+            print mesh_name
+        val = sum([ mesh_name.lower().find(word.strip()) != -1 for word in values_mod ])
+        #print mesh_name, val
+        if val > len(values_mod) / 2.0:
+            #print mesh_name, disease
+            #phenotype = mesh_name
+            val_and_phenotypes.append((float(val)/len(mesh_name.split()), mesh_name))
+    #print values, values_mod
+    #print val_and_phenotypes
+    if len(val_and_phenotypes) > 0:
+        val_and_phenotypes.sort()
+        phenotype = val_and_phenotypes[-1][1]
+    return phenotype
 
 
 def get_data_helper(command, parameter, parameter2=None, parameter_effect=None, skip=0):
@@ -152,7 +233,7 @@ def choose_fda_drug_name(names):
         #        name = words[0]
         #    if name in ("compound", "dr.", "salicylate", "sodium"):
         #        continue
-        N, n, M, k = parse_fda.get_counts_for_drug(name, None, None)
+        N, n, M, k = get_counts_for_drug(name, None, None)
         time.sleep(0.3) # 240 request / min limit
         values.append((N, name))
     values.sort()
@@ -199,10 +280,10 @@ def get_counts_from_data(drug, disease, condition=None):
 
 
 def get_counts(command, parameter, parameter2=None, parameter_effect=None):
-    prameter_org = parameter
+    parameter_org = parameter
     parameter = parameter.replace(" ", "+").replace("-", "+")
     if parameter2 is not None:
-	prameter2_org = parameter2
+	parameter2_org = parameter2
         parameter2 = parameter2.replace(" ", "+").replace("-", "+")
     if parameter_effect is not None:
         parameter_effect = parameter_effect.replace(" ", "+").replace("-", "+")
@@ -249,7 +330,7 @@ def get_counts(command, parameter, parameter2=None, parameter_effect=None):
     except urllib2.HTTPError:
 	if parameter_effect is not None:
 	    n = 0
-	print "No info for", parameter, parameter2, parameter_effect
+	#print "No info for", parameter, parameter2, parameter_effect
 	if parameter2 is not None or parameter_effect is not None:
 	    print url
         return n
@@ -282,7 +363,7 @@ def z_scorize_counts(count_term_pairs):
     #	values.append((count, term))
     #count_term_pairs = values
     values = []
-    m, s = calc_mean_and_sigma(zip(*count_term_pairs)[0])
+    m, s = stat_utilities.calc_mean_and_sigma(zip(*count_term_pairs)[0])
     for count, term in count_term_pairs:
         val = count - m
         if s != 0:
@@ -381,12 +462,12 @@ def get_drugs_for_disease(disease):
 
 
 def get_diseases_for_drug(drug):
+    values = []
     try:
         response = get_counts("drug-disease2", drug)
     except urllib2.HTTPError:
         print "No info for", drug
-        return []
-    values = []
+        return values
     for row in response:
         term = row["term"]
         count = row["count"]

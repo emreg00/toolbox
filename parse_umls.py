@@ -6,7 +6,7 @@ def main():
     rel_file = base_dir + "MRREL.RRF"
     #get_basic_info(desc_file, rel_file)
     #get_drug_info(desc_file, rel_file)
-    mesh_id_to_name, concept_id_to_mesh_id = get_mesh_id_mapping(desc_file)
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(desc_file)
     print len(mesh_id_to_name)
     print mesh_id_to_name["D003924"]
     return
