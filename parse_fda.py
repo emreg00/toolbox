@@ -15,6 +15,7 @@ FIELD_DISEASE = "patient.drug.drugindication"
 FIELD_EFFECT = "patient.reaction.reactionmeddrapt"
 N_MIN = 5 
 
+
 def main():
     #drug = "montelukast" 
     #drug = "vitamin e" # "vit. e"
