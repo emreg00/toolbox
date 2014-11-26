@@ -1,4 +1,8 @@
-from funcassociate import client
+try:
+    from external.funcassociate import client
+except:
+    client = None
+    print "Import error: Funcassociate. Make sure that funcassociate is in toolbox!"
 
 def main():
     file_name = "gene_list.txt"

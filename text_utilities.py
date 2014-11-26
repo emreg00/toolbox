@@ -1,5 +1,46 @@
 
-def convert_to_R_string(txt, mapping=[(" ", "."), (",", ""), ("'", "")]):
+try:
+    from toolbox.external.negex import negex #sortRules, negTagger
+except:
+    print "Import error: Negex. Using keyword matching instead"
+
+
+KEYWORDS_NEGATIVE = [ " not ", " no ", " except ", " exception ", " inappropriate ", " without ", " absence " ]
+KEYWORDS_SYMPTOMATIC = [ " protect", " maint", " manage", " symptom", " relie", " palliati", " alleviat" ]
+
+
+def get_negex_rules(file_name):
+    f = open(file_name)
+    rules = negex.sortRules(f.readlines())
+    return rules
+
+
+def is_negated(txt, phrase, rules = None):
+    negative = False
+    if rules is not None:
+        tagger = negex.negTagger(sentence = txt, phrases = [ phrase ], rules = rules, negP = False)
+	negative = tagger.getNegationFlag() == "negated"
+	#txt_tagged = tagger.getNegTaggedSentence()
+    else:
+	negative, i = in_keywords(txt, KEYWORDS_NEGATIVE)
+    return negative
+
+
+def is_symptomatic(txt):
+    return in_keywords(txt, KEYWORDS_SYMPTOMATIC)
+
+
+def in_keywords(txt, keywords):
+    flag = False
+    for i, keyword in enumerate(keywords):
+	idx = txt.find(keyword)
+	if idx != -1:
+	    flag = True
+	    break
+    return flag, i
+
+
+def convert_to_R_string(txt, mapping=[(" ", "."), (",", ""), ("'", ""), ("-", ".")]):
     #txt = txt.replace(",","").replace(" ", ".").replace("'", "")
     for a, b in mapping:
 	txt = txt.replace(a,b)

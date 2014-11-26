@@ -1,9 +1,10 @@
 import urllib2, os, cPickle, re, time
 from bs4 import BeautifulSoup
+from toolbox import text_utilities
 
 
-OFFSET = 66000
-LIMIT = 105000 #105000 # 40-50K seem depleted (based on the first 1000)
+OFFSET = 0
+LIMIT = 111000 # 40-50K seem depleted (based on the first 1000)
 
 def main():
     #drug = "montelukast" 
@@ -12,12 +13,12 @@ def main():
     #disease = "asthma"
     output_dir = "/home/emre/arastirma/data/drug/fda/spl/"
     #fetch_spl_data(output_dir, OFFSET, LIMIT)
-    for spl in range(1000): #[ 75, 82, 392 ]: #[ 2, 3, 4, 5, 8, 4013, 64602, 92978 ]:
+    for spl in range(19000,20000): #[ 2, 3, 4, 5, 8, 4013, 64602, 92978 ]: #[ 75, 82, 392, 10014 ]: #
         try:
             name, indication = read_spl_data(output_dir + "%d.html" % spl)
         except:
             continue
-        #print name, indication
+        print name #, indication
     return
 
 
@@ -27,102 +28,107 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
     for phenotype, mesh_id in phenotype_to_mesh_id.items():
         mesh_id_to_phenotype[mesh_id] = phenotype
     for drugbank_id, diseases in drug_to_diseases.iteritems():
-        for phenotype, dui in diseases:
-	    if dui in mesh_id_to_phenotype: # In the disease data set
-		disease = mesh_id_to_phenotype[dui].lower()
-                disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
+        for phenotype, dui, val in diseases:
+            if val > 0:
+                if dui in mesh_id_to_phenotype: # In the disease data set
+                    disease = mesh_id_to_phenotype[dui].lower()
+                    disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
     return disease_to_drugs
 
 
-def get_drug_disease_mapping(selected_drugs, drug_to_name, drug_to_synonyms, mesh_id_to_name, mesh_id_to_name_with_synonyms, dump_file):
+def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_to_drug, mesh_id_to_name, mesh_id_to_name_with_synonyms, negex_file, dump_file):
     if os.path.exists(dump_file):
 	drug_to_diseases = cPickle.load(open(dump_file))
 	return drug_to_diseases 
-    drug_to_diseases = {} # (mesh_id, mesh_term, n, n_max, ri) 
-    exp = re.compile("-\d-")
-    mesh_name_to_ids = {}
+    drug_to_diseases = {} # (mesh_id, mesh_term, non-symptomaticy score) 
+    mesh_name_to_id = {}
+    # Mesh mapping already filtered for those that are disease terms
     for mesh_id, names in mesh_id_to_name_with_synonyms.iteritems():
-        if mesh_id.startswith("Q"):
-            continue
         for name in names:
+            # Taking into account abbreviations (<= 4 letter) and the case of AIDS
+            if name.isupper() and len(name) > 1:
+                pass
+            else:
+                name = name.lower()
+            #name = " " + name 
             #name = name.decode('utf-8','ignore')
-            name = name.replace(",", "").lower()
-            mesh_name_to_ids.setdefault(name, []).append(mesh_id)
-    not_found_in_mesh = set()
-    modified_in_mesh = set()
-    multiple_mesh_id = {}
+            for name_mod in [ name, name.replace(",", ""), name.replace("-", " "), name.replace(",", "").replace("-", " ") ]:
+                mesh_name_to_id[name_mod] = mesh_id
+    # Get keywords / negex for text matching
+    negex_rules = text_utilities.get_negex_rules(negex_file)
     flag = False 
-    for drugbank_id in selected_drugs:
-	if drugbank_id == "DB00229":
+    for spl in xrange(LIMIT):
+	if spl == OFFSET:
 	    flag = True
 	if flag == False: 
 	    continue
-        # Find the most common drug name in FDA for the DrugBank drug
-	names = [ drug_to_name[drugbank_id] ]
-        if drugbank_id in drug_to_synonyms:
-            for synonym in drug_to_synonyms[drugbank_id]:
-                if synonym.find("[") != -1 or synonym.find("{") != -1:
-                    continue
-                m = exp.search(synonym)
-                if m:
-                    continue
-                names.append(synonym)
-	drug, n = choose_fda_drug_name(names)
-        if drug is None: # No match in FDA api
+        try:
+            name, indication = read_spl_data(output_dir + "%d.html" % spl)
+            print "SPL:", spl
+        except:
             continue
-	#print drugbank_id, drug, n
-	# Get diseases for that drug in FDA
-        diseases = get_diseases_for_drug(drug)
-        #time.sleep(0.25) # 240 request / min limit
-        if len(diseases) == 0:
+        # Get drugbank id from name in the label
+        drugbank_id = None
+        if name in name_to_drug:
+            drugbank_id = name_to_drug[name]
+        elif name in synonym_to_drug:
+            drugbank_id =  synonym_to_drug[name]
+        else:
             continue
-        f = open(dump_file + ".txt", 'a')
-        for n, disease in diseases:
-            if n < N_MIN: 
-                continue
-            disease = disease.lower()
-            phenotype = convert_fda_name_to_mesh(disease, mesh_name_to_ids)
-            if phenotype is None:
-                not_found_in_mesh.add(disease)
-                continue
-            duis = mesh_name_to_ids[phenotype]
-            if len(duis) > 1:
-                multiple_mesh_id[phenotype] = duis
-                continue
-            dui = duis[0]
-            if dui not in mesh_id_to_name:
-                continue
-            phenotype_mod = mesh_id_to_name[dui]
-            if phenotype != phenotype_mod: # matched to synonym or removed 's
-                modified_in_mesh.add((phenotype, phenotype_mod))
-            # API can not deal with x^s y / x's y such as crohn's disease and non-hodgkin's lymphoma
-            idx = disease.find("^s")
-            if idx == -1:
-                idx = disease.find("'s")
-            if idx != -1: 
-                phenotype = disease[:idx]
-            # Get efficacy for each disease
-            values, values_eff = get_drug_treatment(drug, phenotype)
-            time.sleep(0.3) # 240 request / min limit
-            if values is None or len(values) == 0:
-                continue
-            z_max, count_max, term = values[0]
-            z_ineff, count_ineff, z_adverse, count_adverse = values_eff
-            # Safety reports provide multiple drug-disease pairs count_max is more reliable than n
-            #print disease, phenotype, n, count_max, count_ineff, count_adverse
-            f.write("%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\n" % (drugbank_id, drug_to_name[drugbank_id], drug, disease, phenotype_mod, dui, n, count_max, count_ineff, count_adverse))
-            #drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, dui, n, count_max, count_ineff, count_adverse))
-        f.close()
-    print "Not found in MeSH:", not_found_in_mesh
-    print "Modified in MeSH:", modified_in_mesh
-    print "Multiple id in MeSH:", multiple_mesh_id
-    for line in open(dump_file + ".txt"):
-        (drugbank_id, name, fda_name, fda_disease, phenotype, dui, n, count_max, count_ineff, count_adverse) = line.strip().split("\t")
-        for mesh_id in dui.split(","):
-            drug_to_diseases.setdefault(drugbank_id, []).append((phenotype, mesh_id, int(n), int(count_max), int(count_ineff), int(count_adverse)))
+        #if drugbank_id not in selected_drugs: # Wont happen since name mapping used only selected_drugs
+        #    print "Not in selected:", drugbank_id
+        #    continue
+	print drugbank_id, name
+        # Sentencify
+        indications = []
+        for txt in indication:
+            for sentence in txt.lower().split("."):
+                indications.append(sentence)
+                if False: # Was removing negative sentences from indication: not / except / no / inappropriate, now assign -1 score
+                    negative, i = text_utilities.is_negated(sentence)
+                    if not negative:
+                        indications.append(sentence)
+                    else:
+                        print "N:", sentence
+        # Match the indication to mesh keywords
+        for mesh_name, dui in mesh_name_to_id.iteritems():
+            exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
+            for sentence in indications:
+                # Look for mesh term 
+                #idx = sentence.find(mesh_name)
+                m = exp.search(sentence)
+                if m is None: #idx == -1:
+                    continue
+                val = 1
+                # Symptomatic cases: protect / maintain / manage(ment) / symptom / relie(f) - relie(ve) / palliati(ve) - palliati(on) / alleviate
+                symptomatic, i = text_utilities.is_symptomatic(sentence)
+                if symptomatic:
+                    if i == 0:
+                        val = 0.8 # protection
+                    elif i == 1:
+                        val = 0.7 # maintain / maintenance
+                    elif i == 2:
+                        val = 0.6 # manage(ment)
+                    else:
+                        val = 0.5
+                negative = text_utilities.is_negated(sentence, mesh_name, negex_rules)
+                negative2 = text_utilities.is_negated(sentence, mesh_name, None) 
+                if negative and negative2:
+                    val = -1
+                elif negative:
+                    val = -0.8
+                elif negative2:
+                    val = -0.5
+                if negative != negative2: #!
+                    print "N:", mesh_name, negative, negative2, sentence
+                #if dui not in mesh_id_to_name: 
+                #    continue
+                phenotype = mesh_id_to_name[dui]
+                #if val != 1:
+                #print "A/S/N:", mesh_name, val, phenotype, dui, sentence
+                drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases
-
 
 
 def get_data(command, parameter):
@@ -168,8 +174,8 @@ def read_spl_data(file_name):
         if name is not None:
             print "Multiple name:", name
         name = tag.strong.string.encode("ascii", "ignore")
-        words = name.split("-")
-        name = words[0].rstrip().lower()
+        words = name.split(" - ")
+        name = words[0].strip().lower()
     for tag in soup.find_all('h1'):
         #print tag.name 
         if tag.string is None:
@@ -182,35 +188,51 @@ def read_spl_data(file_name):
             for tag_p in tag.find_all_next():
                 try:
                     #print "II:", tag_p.name
-                    if tag_p.name in "h1": #("h1", "h2"):
+                    if tag_p.name == "h1": # in ("h1", "h2"):
                         break
                 except:
                     continue
                 if tag_p.name == "p" or tag_p.name == "li":
-                    txt = tag_p.get_text().replace("  ", "").replace("\n","").encode("ascii", "ignore")
+                    txt = tag_p.get_text().strip()
+                    if txt == "":
+                        continue
+                    tag2 = tag.find_next("h1")
+                    txt2 = tag2.get_text().strip()
+                    idx = txt.find(txt2)
+                    if idx != -1:
+                        txt = txt[:idx]
+                    txt = " ".join(txt.split()) 
+                    txt = txt.encode("ascii", "ignore")
                     if txt == "":
                         continue
                     indication.append(txt)
-                    #if tag_p.string is None:
-                    #    continue
             if len(indication) == 0:
                 print "No indication:", name
-                for tag_p in tag.next_siblings:
+                for i, tag_p in enumerate(tag.next_siblings):
                     try:
                         #print "I:", tag_p.name
-                        if tag_p.name in ("h1", "h2"):
+                        #print tag_p.string
+                        if i == 0 and tag_p.string is not None:
+                            txt = tag_p.string
+                            txt = " ".join(txt.split()) 
+                            txt = txt.encode("ascii", "ignore")
+                            if txt == "":
+                                continue
+                            indication.append(txt)
+                        if tag_p.name == "h1":  
                             break
                     except:
                         continue
-                    #if tag_p.string is None:
-                    #    continue
-                    #txt = tag_p.string.replace("  ", "").replace("\n","")
-                    txt = tag_p.get_text() 
-                    #tag2 = tag.find_next("h1")
-                    #txt2 = tag2.get_text()
-                    #idx = txt.find(txt2)
-                    #txt = txt[:idx]
-                    txt = txt.replace("  ", "").replace("\n","")
+                    #txt = tag_p.string.replace("  ", " ").replace("\t"," ").replace("\n","")
+                    txt = tag_p.get_text().strip()
+                    if txt == "":
+                        continue
+                    tag2 = tag.find_next("h1")
+                    txt2 = tag2.get_text().strip()
+                    idx = txt.find(txt2)
+                    if idx != -1:
+                        txt = txt[:idx]
+                    txt = " ".join(txt.split()) 
                     txt = txt.encode("ascii", "ignore")
                     if txt == "":
                         continue
