@@ -117,9 +117,9 @@ class UMLS(object):
 		if source_types is not None and source not in source_types: 
 		    continue
 		d = self.concept_id_to_relations.setdefault(target_id, {})
-		d[source_id] = (relation, source)
+		d.setdefault(source_id, []).append((relation, source))
 		if relation_a != "":
-		    d[source_id] = (relation_a, source)
+		    d[source_id].append((relation_a, source))
 	return self.concept_id_to_relations 
 
 
@@ -152,10 +152,10 @@ class UMLS(object):
 		i += 1
 		#if i > 1000:
 		#	break
-	    self.ontology.reverse()
+	    self.ontology = self.ontology.reverse()
 	if root_concept is not None:
 	    root = self.get_concept_id(root_concept)
-	    g = networkx.dfs_tree(self.ontology, root)
+	    g = get_tree_rooted_at(self.ontology, root)
 	else:
 	    g = self.ontology
 	return g
@@ -180,6 +180,22 @@ class UMLS(object):
 	return drug_to_diseases
 
 
+def get_tree_rooted_at(g, root):
+    neighbors = g.neighbors(root)
+    nodes_selected = set([root]) | set(neighbors)
+    while True:
+	neighbors_inner = set()
+	for node in neighbors:
+	    neighbors_inner |= set(g.neighbors(node))
+	neighbors = set(list(neighbors_inner))
+	#if len(neighbors) == 0: # does not work probably due to circularity
+	#    break
+	if len(neighbors - nodes_selected) == 0:
+	    break
+	nodes_selected |= neighbors_inner
+    return g.subgraph(nodes_selected)
+
+
 def get_mesh_id_mapping(desc_file, rel_file, only_diseases = True, dump_file = None): 
     if dump_file is not None and os.path.exists(dump_file):
 	values = cPickle.load(open(dump_file))
@@ -188,7 +204,7 @@ def get_mesh_id_mapping(desc_file, rel_file, only_diseases = True, dump_file = N
     umls = UMLS(desc_file, rel_file)
     concept_ids_disease = None
     if only_diseases:
-	g = get_mesh_disease_ontology(desc_file, rel_file, umls)
+	g = get_mesh_disease_ontology(desc_file, rel_file, umls=umls)
 	concept_ids_disease = set(g.nodes())
     source_id_to_concept = {} # only main headers
     source_id_to_concepts = {} # all concepts including synonyms
@@ -209,17 +225,32 @@ def get_mesh_id_mapping(desc_file, rel_file, only_diseases = True, dump_file = N
     return source_id_to_concept, concept_id_to_mesh_id, source_id_to_concepts
 
 
-def get_mesh_disease_ontology(desc_file, rel_file, umls = None):
+def get_mesh_disease_ontology(desc_file, rel_file, umls = None, dump_file = None):
+    if dump_file is not None and os.path.exists(dump_file):
+	g = cPickle.load(open(dump_file))
+	return g
     if umls is None:
 	umls = UMLS(desc_file, rel_file)
     root = "Diseases (MeSH Category)"
     sources = set(["MSH"]) 
-    relations = set(["PAR"]) 
+    relations = set(["CHD"]) 
     g = umls.get_ontology(root_concept = root, relation_types = relations, source_types = sources)
-    #print "Shrunk ontology:", len(g.nodes()), len(g.edges())
+    #print "Disease ontology:", len(g.nodes()), len(g.edges()) 
     #for node in g.neighbors(umls.get_concept_id(root)):
     #	print node, umls.get_concepts(node, concept_sources = sources)
+    cPickle.dump(g, open(dump_file, 'w'))
     return g
+
+
+def get_mesh_id_to_disease_category(desc_file, rel_file, dump_file = None):
+    g = get_mesh_disease_ontology(desc_file, rel_file, dump_file = dump_file) 
+    root = "C0012674" # "Diseases (MeSH Category)"
+    concept_id_to_top_ids = {}
+    for parent in g.neighbors(root):
+	t = get_tree_rooted_at(g, parent)
+	for node in t.nodes():
+	    concept_id_to_top_ids.setdefault(node, []).append(parent)
+    return concept_id_to_top_ids
 
 
 def get_snomedct_drug_ontology(desc_file, rel_file, umls = None):
@@ -236,7 +267,7 @@ def get_basic_info(desc_file, rel_file):
     u = UMLS(desc_file, rel_file)
     concept = "Diabetes Mellitus" #"Triazole antifungals"
     sources = set(["MSH"]) # set(["SNOMEDCT"])
-    relations = set(["PAR"]) # set(["isa"])
+    relations = set(["CHD"]) # set(["isa"])
     concept_id = u.get_concept_id(concept)
     print concept, concept_id
     concepts = u.get_concepts(concept_id, concept_sources = sources)

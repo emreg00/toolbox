@@ -16,9 +16,20 @@ def main():
         print "(%.2f - %.2f) / %.2f = %.2f" % ( sc, m, s, (sc - m) / s)
     return
 
-def convert_p_values_to_z_scores(pvalues):
+
+def convert_p_values_to_z_scores(p_values):
     a = np.random.normal(size=1000000) #1000000 # 10000000
-    return map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), pvalues)
+    #z_score = st.norm.ppf(1 - p_values)
+    return map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), p_values)
+
+
+def convert_z_scores_to_p_values(z_scores, one_sided = True):
+    #p_values = 1 - st.norm.cdf(z_scores)
+    p_values = stats.norm.sf(z_scores) 
+    if not one_sided:
+        p_values *= 2
+    return p_values
+
 
 def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-Hochberg"):
     """
@@ -59,14 +70,18 @@ def correct_pvalues_for_multiple_testing(pvalues, correction_type = "Benjamini-H
 	raise ValueError("Unknown correction type: " + correction_type)
     return new_pvalues
 
+
 def calc_mean_and_sigma(alist):
     return mean(alist), sigma(alist)
+
 
 def mean(x):
     return np.mean(x)
 
+
 def sigma(x):
     return np.std(x)
+
 
 def correlation(x, y, cor_type="pearson"):
     # coef, p-val
@@ -77,6 +92,7 @@ def correlation(x, y, cor_type="pearson"):
     else:
 	raise ValueError("Invalid correlation type!")
     return coef, pval
+
 
 def statistical_test(x, y, test_type="wilcoxon", alternative="two-sided"):
     # test stat, p-val
@@ -124,7 +140,7 @@ def hypergeometric_test(picked_good, picked_all, all_all, all_good):
     N = len(all_all) 
     M = len(all_good) 
     n = len(picked_all) 
-    val = sum(stats.hypergeom.pmf(range(k, min(n, M)+1), N, M, n))
+    val = sum(stats.hypergeom.pmf(range(k, n+1), N, M, n)) # was min(n, M) instead of n
     # in stats doc M is N, n is M, N is n
     #M = len(all_all) 
     #n = len(all_good) 
@@ -143,9 +159,11 @@ def density_estimation(occurences, possible_values):
     p = kde(possible_values)
     return p / sum(p)
 
+
 def fisher_exact(tp, fp, fn, tn, alternative="two-sided"):
     oddsratio, pvalue = stats.fisher_exact([[tp, fp], [fn, tn]], alternative)
     return oddsratio, pvalue
+
 
 if __name__ == "__main__":
     main()

@@ -7,7 +7,7 @@ CONFIG = configuration.Configuration()
 try:
     API_USER_KEY = CONFIG.get("FDA_API_KEY") # change this value with custom API key
 except:
-    print "API key not found!"
+    print "Warning: openFDA API key not found!"
     API_USER_KEY = None
 LIMIT = 100
 FIELD_DRUG = "patient.drug.medicinalproduct"

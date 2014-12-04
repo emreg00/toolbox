@@ -15,6 +15,31 @@ cPalette <- brewer.pal(9,"Blues")
 main<-function() {
 }
 
+
+get.z.score<-function(val, values) {
+    z = (val - mean(values)) / sd(values)
+}
+
+
+convert.p.value<-function(pval, or=1) {
+    if ( or > 1 ) {
+	z <- qnorm( pval / 2 );
+    } else { 
+	z <- -(qnorm( pval / 2 ));
+    }
+    return(z);
+}
+
+
+convert.z.score<-function(z, one.sided=T) {
+    pval = pnorm(-(abs(z)));
+    if(!one.sided) {
+	pval = 2 * pval
+    }
+    return(pval);
+}
+
+
 get.Fishers.enrichment<-function(file.name) {
 
     d=read.table(file.name, header=T)

@@ -1,9 +1,13 @@
 import urllib2, os, cPickle, json
 import configuration
 
-CONFIG = configuration.Configuration() 
+try:
+    CONFIG = configuration.Configuration() 
+    LINCS_USER_KEY = CONFIG.get("LINCS_API_KEY") # change this value with custom API key
+except:
+    print "Warning: Using default LINCS API key"
+    LINCS_USER_KEY = 'lincsdemo' 
 
-LINCS_USER_KEY = CONFIG.get("LINCS_API_KEY") #'lincsdemo' # change this value with custom API key
 
 def main():
     #drug = "InChIKey=PSGAAPLEWMOORI-PEINSRQWSA-N" 
