@@ -255,13 +255,12 @@ def get_disease_specific_drugs(parser, selected_drugs, phenotypes):
 		    if all([ indication.find(word.strip()) != -1 for word in values ]):
 			disease_to_drugs.setdefault(disease, set()).add(drug)
 			indication_to_diseases.setdefault(indication, set()).add(disease)
-    # Print non-matching indications #!
+    return disease_to_drugs
+    # Print non-matching indications 
     for indication, diseases in indication_to_diseases.iteritems():
 	if len(diseases) == 0:
-	    continue
 	    print indication.encode('ascii','ignore')
 	elif indication.find(" not ") != -1 or indication.find(" except ") != -1:
-	    continue
 	    print diseases, indication.encode('ascii','ignore')
     #print disease_to_drugs["diabetes mellitus, type 2"] 
     return disease_to_drugs

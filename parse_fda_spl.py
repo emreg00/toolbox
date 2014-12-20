@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 from toolbox import text_utilities
 
 
-OFFSET = 0
-LIMIT = 111000 # 40-50K seem depleted (based on the first 1000)
+OFFSET = 1
+LIMIT = 111000 # 40K is depleted 
 
 def main():
     #drug = "montelukast" 
@@ -14,6 +14,7 @@ def main():
     output_dir = "/home/emre/arastirma/data/drug/fda/spl/"
     #fetch_spl_data(output_dir, OFFSET, LIMIT)
     for spl in range(19000,20000): #[ 2, 3, 4, 5, 8, 4013, 64602, 92978 ]: #[ 75, 82, 392, 10014 ]: #
+        print spl
         try:
             name, indication = read_spl_data(output_dir + "%d.html" % spl)
         except:
@@ -42,18 +43,22 @@ def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_t
 	return drug_to_diseases 
     drug_to_diseases = {} # (mesh_id, mesh_term, non-symptomaticy score) 
     mesh_name_to_id = {}
+    abbreviation_to_id = {}
     # Mesh mapping already filtered for those that are disease terms
     for mesh_id, names in mesh_id_to_name_with_synonyms.iteritems():
         for name in names:
-            # Taking into account abbreviations (<= 4 letter) and the case of AIDS
+            # Take into account abbreviations (<= 4 letter) and the case of AIDS
             if name.isupper() and len(name) > 1:
-                pass
+		abbreviation_to_id[name] = mesh_id
             else:
                 name = name.lower()
-            #name = " " + name 
-            #name = name.decode('utf-8','ignore')
-            for name_mod in [ name, name.replace(",", ""), name.replace("-", " "), name.replace(",", "").replace("-", " ") ]:
-                mesh_name_to_id[name_mod] = mesh_id
+		# Remove the final s (plural) and match later with an additional s
+		if name.endswith('s'):
+		    name = name[:-1] 
+		#name = " " + name 
+		#name = name.decode('utf-8','ignore')
+		for name_mod in [ name, name.replace(",", ""), name.replace("-", " "), name.replace(",", "").replace("-", " ") ]:
+		    mesh_name_to_id[name_mod] = mesh_id
     # Get keywords / negex for text matching
     negex_rules = text_utilities.get_negex_rules(negex_file)
     flag = False 
@@ -75,9 +80,9 @@ def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_t
             drugbank_id =  synonym_to_drug[name]
         else:
             continue
-        #if drugbank_id not in selected_drugs: # Wont happen since name mapping used only selected_drugs
-        #    print "Not in selected:", drugbank_id
-        #    continue
+        if selected_drugs is not None and drugbank_id not in selected_drugs: # Wont happen since name mapping used only selected_drugs
+            #print "Not in selected:", drugbank_id
+            continue
 	print drugbank_id, name
         # Sentencify
         indications = []
@@ -99,36 +104,51 @@ def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_t
                 m = exp.search(sentence)
                 if m is None: #idx == -1:
                     continue
-                val = 1
-                # Symptomatic cases: protect / maintain / manage(ment) / symptom / relie(f) - relie(ve) / palliati(ve) - palliati(on) / alleviate
-                symptomatic, i = text_utilities.is_symptomatic(sentence)
-                if symptomatic:
-                    if i == 0:
-                        val = 0.8 # protection
-                    elif i == 1:
-                        val = 0.7 # maintain / maintenance
-                    elif i == 2:
-                        val = 0.6 # manage(ment)
-                    else:
-                        val = 0.5
-                negative = text_utilities.is_negated(sentence, mesh_name, negex_rules)
-                negative2 = text_utilities.is_negated(sentence, mesh_name, None) 
-                if negative and negative2:
-                    val = -1
-                elif negative:
-                    val = -0.8
-                elif negative2:
-                    val = -0.5
-                if negative != negative2: #!
-                    print "N:", mesh_name, negative, negative2, sentence
+		val = get_value_of_association(mesh_name, sentence, negex_rules)
                 #if dui not in mesh_id_to_name: 
                 #    continue
                 phenotype = mesh_id_to_name[dui]
                 #if val != 1:
                 #print "A/S/N:", mesh_name, val, phenotype, dui, sentence
                 drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
+	# Handle the abbreviations separately (keep the indication "upper" and match against it)
+        for mesh_name, dui in abbreviation_to_id.iteritems():
+            exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
+	    for sentence in indication:
+		m = exp.search(sentence)
+		if m is None:
+		    continue
+		val = get_value_of_association(mesh_name, sentence, negex_rules)
+                phenotype = mesh_id_to_name[dui]
+                drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases
+
+
+def get_value_of_association(mesh_name, sentence, negex_rules):
+    val = 1
+    # Symptomatic cases: protect / maintain / manage(ment) / symptom / relie(f) - relie(ve) / palliati(ve) - palliati(on) / alleviate
+    symptomatic, i = text_utilities.is_symptomatic(sentence)
+    if symptomatic:
+	if i == 0:
+	    val = 0.8 # protection
+	elif i == 1:
+	    val = 0.7 # maintain / maintenance
+	elif i == 2:
+	    val = 0.6 # manage(ment)
+	else:
+	    val = 0.5
+    negative = text_utilities.is_negated(sentence, mesh_name, negex_rules)
+    negative2 = text_utilities.is_negated(sentence, mesh_name, None) 
+    if negative and negative2:
+	val = -1
+    elif negative:
+	val = -0.8
+    elif negative2:
+	val = -0.5
+    #if negative != negative2: 
+    #    print "N:", mesh_name, negative, negative2, sentence
+    return val
 
 
 def get_data(command, parameter):
