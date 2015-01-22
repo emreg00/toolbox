@@ -56,6 +56,7 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
     phase_to_value = { "Phase 0": 0.5, "Phase 1": 0.6, "Phase 1/Phase 2": 0.65, "Phase 2": 0.7, "Phase 2/Phase 3": 0.75, "Phase 3": 0.8, "Phase 3/Phase 4":0.85, "Phase 4": 0.9, "N/A": 0.5 }
     status_to_value = { "Terminated": -0.5, "Withdrawn": -1} #,"Completed", "Recruiting", "Not yet recruiting"
     drug_to_diseases = {}
+    drug_to_diseases_n_study = {}
     non_matching_drugs = set()
     for drug, ctids in drug_to_ctids.iteritems():
 	drugbank_id = None
@@ -71,7 +72,7 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
 		continue
 	if selected_drugs is not None and drugbank_id not in selected_drugs:
 	    continue
-	interventions = set()
+	phenotype_to_count = {} 
 	for ctid in ctids:
 	    phase, status = ctid_to_phase[ctid]
 	    val = 0.5
@@ -79,15 +80,20 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
 		print "Unknown phase:", phase
 	    if status in status_to_value and phase in phase_to_value:
 		val = phase_to_value[phase] - 0.1
-	    interventions |= ctid_to_conditions[ctid]
-	if len(interventions) == 0:
-	    continue
-	for intervention in interventions:
-	    if intervention not in intervention_to_mesh_name:
-		continue
-	    phenotype = intervention_to_mesh_name[intervention]
+	    for intervention in ctid_to_conditions[ctid]: 
+		if intervention not in intervention_to_mesh_name:
+		    continue
+		phenotype = intervention_to_mesh_name[intervention]
+		i = phenotype_to_count.setdefault(phenotype, 0)
+		phenotype_to_count[phenotype] = i + 1
+		dui = mesh_name_to_id[phenotype]
+		# Phase based value assignment
+		drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val)) 
+	# Number of study based value assignment
+	for phenotype, val in phenotype_to_count.iteritems(): 
 	    dui = mesh_name_to_id[phenotype]
-	    drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
+	    drug_to_diseases_n_study.setdefault(drugbank_id, set()).add((phenotype, dui, val)) 
+    #drug_to_diseases = drug_to_diseases_n_study
     #print "Non matching drugs:", len(non_matching_drugs) 
     #print len(drug_to_diseases), drug_to_diseases.items()[:5]
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
@@ -220,7 +226,7 @@ def get_interventions(base_dir):
     return drug_to_ctids #ctid_to_drugs 
 
 
-def get_drug_to_interventions():
+def get_drug_to_interventions(drug_to_ctids):
     drug_to_interventions = {}
     non_matching_drugs = set()
     for drug, ctids in drug_to_ctids.iteritems():
