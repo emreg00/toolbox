@@ -36,6 +36,12 @@ try:
 except:
     print "SCIPY is not installed, rank-based distance methods wont work"
 
+try:
+    from external.genrev import NWSteiner as steiner
+except:
+    print "GenRev not found, steiner wont work"
+
+
 #MIN_NUMBER_OF_PERTURBATION = 25
 MAX_NUMBER_OF_TRIAL = 10
 FINITE_INFINITY = 999999
@@ -57,7 +63,7 @@ def create_graph():
     return networkx.Graph()
 
 def create_graph_with_same_type(G):
-    return create_empty_copy(G)
+    return networkx.create_empty_copy(G)
 
 def create_random_graphs(G, n_random, randomization_type, allow_self_edges, out_prefix):
     """
@@ -171,6 +177,10 @@ def get_all_paths_from(G, source_id):
 
 def get_all_paths_between(G, source_id, target_id, cutoff=None): 
     return networkx.all_simple_paths(G, source_id, target_id, cutoff)
+
+def get_steiner_tree(G, terminals, sp=None):
+    subgraph = steiner.NWConnSteiner(G, terminals, shortestPath=sp)
+    return subgraph
 
 @dumper
 def get_clustering_coefficient(g, dump_file):
@@ -1054,6 +1064,12 @@ def get_subgraph(G, nodes):
 	NetworkX subgraph method wrapper
     """
     return G.subgraph(nodes)
+
+def merge_graphs(G, H):
+    """
+	NetworkX union method wrapper
+    """
+    return networkx.union(G, H)
 
 def get_neighborhood_subgraph(g, nodes):
     """
