@@ -8,15 +8,22 @@ LIMIT = 111000 # 40K is depleted
 
 def main():
     #drug = "montelukast" 
-    drug = "methotrexate"
-    disease = "type 2 diabetes mellitus"
+    #drug = "methotrexate"
+    #disease = "type 2 diabetes mellitus"
     #disease = "asthma"
     output_dir = "/home/emre/arastirma/data/drug/fda/spl/"
+    for spl in (1083, 1156, 3236, 3623, 12235):
+        name, indication, contraindication, warning = read_spl_data(output_dir + "%d.html" % spl)
+        print spl, name
+        print indication
+        print contraindication
+        print warning
+    return 
     #fetch_spl_data(output_dir, OFFSET, LIMIT)
     for spl in range(19000,20000): #[ 2, 3, 4, 5, 8, 4013, 64602, 92978 ]: #[ 75, 82, 392, 10014 ]: #
         print spl
         try:
-            name, indication = read_spl_data(output_dir + "%d.html" % spl)
+            name, indication, contraindication, warning = read_spl_data(output_dir + "%d.html" % spl)
         except:
             continue
         print name #, indication
@@ -68,8 +75,10 @@ def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_t
 	if flag == False: 
 	    continue
         try:
-            name, indication = read_spl_data(output_dir + "%d.html" % spl)
-            print "SPL:", spl
+            name, indication, contraindication, warning = read_spl_data(output_dir + "%d.html" % spl)
+            #print "SPL:", spl #, name
+            if len(warning) == 0: # Skip potentially problematic label
+                continue
         except:
             continue
         # Get drugbank id from name in the label
@@ -83,71 +92,75 @@ def get_drug_disease_mapping(output_dir, selected_drugs, name_to_drug, synonym_t
         if selected_drugs is not None and drugbank_id not in selected_drugs: # Wont happen since name mapping used only selected_drugs
             #print "Not in selected:", drugbank_id
             continue
-	print drugbank_id, name
+	print spl, drugbank_id, name
         # Sentencify
-        indications = []
-        for txt in indication:
-            for sentence in txt.lower().split("."):
-                indications.append(sentence)
-                if False: # Was removing negative sentences from indication: not / except / no / inappropriate, now assign -1 score
-                    negative, i = text_utilities.is_negated(sentence)
-                    if not negative:
-                        indications.append(sentence)
-                    else:
-                        print "N:", sentence
-        # Match the indication to mesh keywords
-        for mesh_name, dui in mesh_name_to_id.iteritems():
-            exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
-            for sentence in indications:
-                # Look for mesh term 
-                #idx = sentence.find(mesh_name)
-                m = exp.search(sentence)
-                if m is None: #idx == -1:
-                    continue
-		val = get_value_of_association(mesh_name, sentence, negex_rules)
-                #if dui not in mesh_id_to_name: 
-                #    continue
-                phenotype = mesh_id_to_name[dui]
-                #if val != 1:
-                #print "A/S/N:", mesh_name, val, phenotype, dui, sentence
-                drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
-	# Handle the abbreviations separately (keep the indication "upper" and match against it)
-        for mesh_name, dui in abbreviation_to_id.iteritems():
-            exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
-	    for sentence in indication:
-		m = exp.search(sentence)
-		if m is None:
-		    continue
-		val = get_value_of_association(mesh_name, sentence, negex_rules)
-                phenotype = mesh_id_to_name[dui]
-                drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
+        for idx, values in enumerate([indication, contraindication, warning]):
+            indications = []
+            for txt in values:
+                for sentence in txt.lower().split("."):
+                    indications.append(sentence)
+            if len(indications) == 0:
+                continue
+            # Match the indication to mesh keywords
+            for mesh_name, dui in mesh_name_to_id.iteritems():
+                exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
+                for sentence in indications:
+                    # Look for mesh term 
+                    m = exp.search(sentence)
+                    if m is None: 
+                        continue
+                    # Was removing negative sentences from indication: not / except / no / inappropriate, now assign -1 score
+                    val = get_value_of_association(mesh_name, sentence, negex_rules, idx)
+                    #if dui not in mesh_id_to_name: 
+                    #    continue
+                    phenotype = mesh_id_to_name[dui]
+                    #if val != 1:
+                    #print "A/S/N:", mesh_name, val, phenotype, dui, sentence
+                    drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
+            # Handle the abbreviations separately (keep the indication "upper" and match against it)
+            for mesh_name, dui in abbreviation_to_id.iteritems():
+                exp = re.compile(r"\b%ss{,1}\b" % mesh_name)
+                for sentence in values:
+                    m = exp.search(sentence)
+                    if m is None:
+                        continue
+                    val = get_value_of_association(mesh_name, sentence, negex_rules, idx)
+                    phenotype = mesh_id_to_name[dui]
+                    drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases
 
 
-def get_value_of_association(mesh_name, sentence, negex_rules):
+def get_value_of_association(mesh_name, sentence, negex_rules, idx):
     val = 1
     # Symptomatic cases: protect / maintain / manage(ment) / symptom / relie(f) - relie(ve) / palliati(ve) - palliati(on) / alleviate
-    symptomatic, i = text_utilities.is_symptomatic(sentence)
-    if symptomatic:
-	if i == 0:
-	    val = 0.8 # protection
-	elif i == 1:
-	    val = 0.7 # maintain / maintenance
-	elif i == 2:
-	    val = 0.6 # manage(ment)
-	else:
-	    val = 0.5
-    negative = text_utilities.is_negated(sentence, mesh_name, negex_rules)
-    negative2 = text_utilities.is_negated(sentence, mesh_name, None) 
-    if negative and negative2:
-	val = -1
-    elif negative:
-	val = -0.8
-    elif negative2:
-	val = -0.5
-    #if negative != negative2: 
-    #    print "N:", mesh_name, negative, negative2, sentence
+    if idx == 0: # indication
+        symptomatic, i = text_utilities.is_symptomatic(sentence)
+        if symptomatic:
+            if i == 0:
+                val = 0.8 # protection
+            elif i == 1:
+                val = 0.7 # maintain / maintenance
+            elif i == 2:
+                val = 0.6 # manage(ment)
+            else:
+                val = 0.5
+        negative = text_utilities.is_negated(sentence, mesh_name, negex_rules)
+        negative2 = text_utilities.is_negated(sentence, mesh_name, None) 
+        if negative and negative2:
+            val = -0.7
+        elif negative:
+            val = -0.6
+        elif negative2:
+            val = -0.5
+        #if negative != negative2: 
+        #    print "N:", mesh_name, negative, negative2, sentence
+    elif idx == 1: # contraindication
+        val = -1
+    elif idx == 2: # warning
+        val = -0.9
+    else:
+        raise ValueError("Unexpected index!")
     return val
 
 
@@ -187,6 +200,8 @@ def fetch_spl_data(output_dir, offset, limit):
 def read_spl_data(file_name):
     name = None
     indication = [] 
+    contraindication = [] 
+    warning = []
     html_doc = open(file_name)
     soup = BeautifulSoup(html_doc, "xml")
     for tag in soup.find_all('p', class_="DocumentTitle"):
@@ -200,11 +215,16 @@ def read_spl_data(file_name):
         #print tag.name 
         if tag.string is None:
             continue
-        header = tag.string.encode().lower()
+        header = tag.string.encode().strip().lower()
         #print header
-        if header.find("indication") != -1 or header in ("uses", "use", "usage"): # "indications", "indications and usage"
-            if header.find("contraindication") != -1:
-                continue
+        flag = None
+        if header.find("contraindication") != -1:
+            flag = "contraindication"
+        elif header.find("indication") != -1 or header in ("uses", "use", "usage"): # "indications", "indications and usage"
+            flag = "indication"
+        if header.find("warning") != -1 and header.find("boxed") == -1:
+            flag = "warning"
+        if flag is not None:
             for tag_p in tag.find_all_next():
                 try:
                     #print "II:", tag_p.name
@@ -225,9 +245,15 @@ def read_spl_data(file_name):
                     txt = txt.encode("ascii", "ignore")
                     if txt == "":
                         continue
-                    indication.append(txt)
-            if len(indication) == 0:
-                print "No indication:", name
+                    if flag == "indication":
+                        indication.append(txt)
+                    elif flag == "contraindication":
+                        contraindication.append(txt)
+                    elif flag == "warning":
+                        warning.append(txt)
+            if (flag == "indication" and len(indication) == 0) or (flag == "contraindication" and len(contraindication) == 0) or (flag == "warning" and len(warning) == 0):
+                # The indications are not encapsulated in <p>
+                #print "No indication:", name
                 for i, tag_p in enumerate(tag.next_siblings):
                     try:
                         #print "I:", tag_p.name
@@ -238,7 +264,12 @@ def read_spl_data(file_name):
                             txt = txt.encode("ascii", "ignore")
                             if txt == "":
                                 continue
-                            indication.append(txt)
+                            if flag == "indication":
+                                indication.append(txt)
+                            elif flag == "contraindication":
+                                contraindication.append(txt)
+                            elif flag == "warning":
+                                warning.append(txt)
                         if tag_p.name == "h1":  
                             break
                     except:
@@ -256,9 +287,13 @@ def read_spl_data(file_name):
                     txt = txt.encode("ascii", "ignore")
                     if txt == "":
                         continue
-                    indication.append(txt)
-            break
-    return name, indication
+                    if flag == "indication":
+                        indication.append(txt)
+                    elif flag == "contraindication":
+                        contraindication.append(txt)
+                    elif flag == "warning":
+                        warning.append(txt)
+    return name, indication, contraindication, warning
 
     
 	
