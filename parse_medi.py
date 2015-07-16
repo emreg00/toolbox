@@ -1,4 +1,4 @@
-import os, cPickle, re 
+import os, cPickle, parse_drugbank
 
 
 def main():
@@ -34,34 +34,8 @@ def get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_
 	return drug_to_diseases 
     drug_to_diseases = {} # (mesh_id, mesh_term, association score) 
     for name, values in name_to_cui_and_confidences.iteritems():
-        name = name.lower()
         # Get drugbank id from name in the label
-        drugbank_id = None
-        drugbank_name = None
-        for db_name, db_id in name_to_drug.iteritems():
-            db_name = db_name.lower()
-            exp = re.compile(r"\b%s\b" % db_name)
-            m = exp.search(name)
-            if m is None: 
-                continue
-            if drugbank_id is not None:
-                print "Multiple match:", drugbank_name, db_name, name
-            drugbank_id = db_id
-            drugbank_name = db_name
-        if drugbank_id is None:
-            for db_name, db_id in synonym_to_drug.iteritems():
-                db_name = db_name.lower()
-                try:
-                    exp = re.compile(r"\b%s\b" % db_name)
-                except:
-                    continue
-                m = exp.search(name)
-                if m is None: 
-                    continue
-                #if drugbank_id is not None:
-                #	print drugbank_id, db_id, name
-                drugbank_id = db_id
-                drugbank_name = db_name
+	drugbank_id, drugbank_name = parse_drugbank.get_drugbank_id_from_name(name, name_to_drug, synonym_to_drug)
         if drugbank_id is None:
             continue
 	print "%s\t%s\t%s" % (drugbank_name, drugbank_id, name)

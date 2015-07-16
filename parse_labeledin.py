@@ -1,4 +1,4 @@
-import os, cPickle, re 
+import os, cPickle, parse_drugbank
 
 
 def main():
@@ -39,34 +39,8 @@ def get_drug_disease_mapping(spl_id_to_cuis, spl_id_to_names, name_to_drug, syno
         if spl_id not in spl_id_to_names:
             continue
 	for name in spl_id_to_names[spl_id]:
-	    name = name.lower()
 	    # Get drugbank id from name in the label
-	    drugbank_id = None
-	    drugbank_name = None
-	    for db_name, db_id in name_to_drug.iteritems():
-		db_name = db_name.lower()
-		exp = re.compile(r"\b%s\b" % db_name)
-		m = exp.search(name)
-		if m is None: 
-		    continue
-		#if drugbank_id is not None:
-		#    print drugbank_id, db_id, name
-		drugbank_id = db_id
-		drugbank_name = db_name
-	    if drugbank_id is None:
-		for db_name, db_id in synonym_to_drug.iteritems():
-		    db_name = db_name.lower()
-                    try:
-                        exp = re.compile(r"\b%s\b" % db_name)
-                    except:
-                        continue
-                    m = exp.search(name)
-		    if m is None: 
-			continue
-		    #if drugbank_id is not None:
-		    #	print drugbank_id, db_id, name
-		    drugbank_id = db_id
-		    drugbank_name = db_name
+	    drugbank_id, drugbank_name = parse_drugbank.get_drugbank_id_from_name(drug, name_to_drug, synonym_to_drug, regex_db_name = True)
 	    if drugbank_id is not None:
 		break
         if drugbank_id is None:

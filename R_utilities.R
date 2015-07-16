@@ -43,7 +43,7 @@ convert.z.score<-function(z, one.sided=NULL) {
 }
 
 ### Visualization methods
-add.theme<-function(p, no.background = F, x.orthogonal = F, vertical.lines=F) {
+add.theme<-function(p, no.background = F, x.orthogonal = F, vertical.lines=F, text.size=18) {
     p = p + theme(plot.background = element_blank(), panel.border = element_blank(), line = element_line(size=1.3))
     if(no.background == T) {
 	#p = p + theme_bw() 
@@ -54,12 +54,12 @@ add.theme<-function(p, no.background = F, x.orthogonal = F, vertical.lines=F) {
 	    p = p + theme(panel.grid.major = element_blank())
 	}
     } else {
-	p = p + theme(panel.background = element_rect(fill = "lavender"), panel.grid.major = element_line(colour="white", size=1.3), axis.line = element_blank(), axis.ticks = element_line(colour="darkgrey"))
+	p = p + theme(panel.background = element_rect(fill = "ghostwhite"), panel.grid.major = element_line(colour="white", size=1.3), axis.line = element_blank(), axis.ticks = element_line(colour="darkgrey")) # lavender
     }
     if(x.orthogonal == T) {
 	p = p + theme(axis.text.x = element_text(size = 8, angle=90, vjust=0.5, hjust=0.5))
     }
-    p = p + theme(text = element_text(size = 18), axis.text = element_text(color='black', size=16), axis.title.x = element_text(vjust=-0.5), axis.title.y = element_text(vjust=1.5), panel.grid.minor = element_blank()) 
+    p = p + theme(text = element_text(size = text.size+2), axis.text = element_text(color='black', size=text.size), axis.title.x = element_text(vjust=-0.5), axis.title.y = element_text(vjust=1.5), panel.grid.minor = element_blank()) 
     return(p)
 }
 
@@ -77,9 +77,9 @@ print.plot<-function(p, out.file, landscape=F) {
 }
 
 
-draw.histogram<-function(d, variable, x.lab, y.lab, binwidth=NULL, x.scale=NULL, out.file=NULL) {
+draw.histogram<-function(d, variable, x.lab, y.lab, binwidth=NULL, x.scale=NULL, y.scale=NULL, text.size=18, coord.flip=F, out.file=NULL) {
     if(is.null(binwidth)) {
-	p = ggplot(d, aes_string(variable)) + geom_histogram(color="grey95", fill=cbPalette[1], alpha = 0.5) 
+	p = ggplot(d, aes_string(variable)) + geom_histogram(color="grey95", fill=cbPalette[1], alpha = 0.8) 
 	#x = d[[variable]]
 	#binwidth = round(abs(max(x) - min(x)) / 30)
 	#print(binwidth)
@@ -87,7 +87,6 @@ draw.histogram<-function(d, variable, x.lab, y.lab, binwidth=NULL, x.scale=NULL,
 	p = ggplot(d, aes_string(variable)) + geom_histogram(color="grey95", fill=cbPalette[1], alpha = 0.8, binwidth=binwidth) # aes(y = ..count..)
     }
     p = p + labs(x = x.lab, y = y.lab) 
-    n = max(d[[variable]])
     if(!is.null(x.scale)) {
 	if(x.scale == "sqrt") {
 	    p = p + scale_x_sqrt() 
@@ -96,11 +95,21 @@ draw.histogram<-function(d, variable, x.lab, y.lab, binwidth=NULL, x.scale=NULL,
 	    p = p + scale_x_log10() + annotation_logticks(sides="b")
 	}
 	if(x.scale == "discrete") {
+	    n = max(d[[variable]])
 	    x.seq = c(1, seq(5, n+1, by=5))
 	    p = p + scale_x_discrete(breaks = x.seq) 
 	}
     }
-    p = add.theme(p)
+    if(!is.null(y.scale)) {
+       if(y.scale == "log") {
+	    p = p + scale_y_log10() + annotation_logticks(sides="l")
+	    #p = p + coord_trans(y="log")
+	}
+    }
+    if(coord.flip==T) {
+	p = p + coord_flip()
+    }
+    p = add.theme(p, no.background=F, text.size=text.size)
 
     print.plot(p, out.file)
     print(summary(d[[variable]]))

@@ -318,6 +318,64 @@ def output_drug_info(file_name, output_file):
     f.close()
     return
 
+
+def get_drugbank_id_from_name(name, name_to_drug, synonym_to_drug, regex_db_name = False):
+    """
+    regex_db_name: True creates a regex with each drugbank name and looks for in in the given name 
+		    (useful for rxname mappings which contain dosages)
+    """
+    drugbank_id = None
+    drugbank_name = None
+    # Try exact match first
+    if name in name_to_drug:
+	drugbank_id = name_to_drug[name]
+	drugbank_name = name
+    elif name in synonym_to_drug:
+	drugbank_id =  synonym_to_drug[name]
+	drugbank_name = name
+    # Try matching drugbank name in the given name
+    else:
+	name = name.lower()
+	if not regex_db_name and len(set("[()]") & set(name)) > 0:
+	    return drugbank_id, drugbank_name 
+	exp = re.compile(r"\b%s\b" % name)
+	for db_name, db_id in name_to_drug.iteritems():
+	    if len(set("[()]") & set(db_name)) > 0:
+		continue
+	    db_name = db_name.lower()
+	    if regex_db_name:
+		exp = re.compile(r"\b%s\b" % db_name)
+		m = exp.search(name)
+	    else:
+		m = exp.search(db_name)
+	    if m is None: 
+		continue
+	    if drugbank_id is not None:
+		print "Multiple match:", drugbank_name, db_name, name
+	    drugbank_id = db_id
+	    drugbank_name = db_name
+	if drugbank_id is None:
+	    for db_name, db_id in synonym_to_drug.iteritems():
+		if len(set("[()]") & set(db_name)) > 0:
+		    continue
+		db_name = db_name.lower()
+		if regex_db_name:
+		    try:
+			exp = re.compile(r"\b%s\b" % db_name)
+		    except:
+			continue
+		    m = exp.search(name)
+		else:
+		    m = exp.search(db_name)
+		if m is None: 
+		    continue
+		#if drugbank_id is not None:
+		#	print drugbank_id, db_id, name
+		drugbank_id = db_id
+		drugbank_name = db_name    
+    return drugbank_id, drugbank_name 
+
+
 def get_drug_info(drug_info_file):
     drug_to_values = {}
     f = open(drug_info_file)

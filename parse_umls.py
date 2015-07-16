@@ -203,7 +203,7 @@ def get_mesh_id_mapping(desc_file, rel_file, only_diseases = True, dump_file = N
 	return source_id_to_concept, concept_id_to_mesh_id, source_id_to_concepts
     umls = UMLS(desc_file, rel_file)
     concept_ids_disease = None
-    if only_diseases:
+    if only_diseases: #! This excludes several synoyms (includes only snonyms of the concept id that is part of the MeSH diseases)
 	g = get_mesh_disease_ontology(desc_file, rel_file, umls=umls)
 	concept_ids_disease = set(g.nodes())
     source_id_to_concept = {} # only main headers
@@ -231,7 +231,7 @@ def get_mesh_disease_ontology(desc_file, rel_file, umls = None, dump_file = None
 	return g
     if umls is None:
 	umls = UMLS(desc_file, rel_file)
-    root = "Diseases (MeSH Category)"
+    root = "Diseases (MeSH Category)" #! Consider adding Mental disorders as well
     sources = set(["MSH"]) 
     relations = set(["CHD"]) 
     g = umls.get_ontology(root_concept = root, relation_types = relations, source_types = sources)
