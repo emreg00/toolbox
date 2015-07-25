@@ -12,7 +12,7 @@ def main():
     #disease = "type 2 diabetes mellitus"
     #disease = "asthma"
     output_dir = "/home/emre/arastirma/data/drug/fda/spl/"
-    for spl in (1083, 1156, 3236, 3623, 12235):
+    for spl in (1083, 1156, 3236, 3623, 12235, 4130):
         name, indication, contraindication, warning = read_spl_data(output_dir + "%d.html" % spl)
         print spl, name
         print indication
@@ -233,11 +233,11 @@ def read_spl_data(file_name):
                 except:
                     continue
                 if tag_p.name == "p" or tag_p.name == "li":
-                    txt = tag_p.get_text().strip()
+                    txt = tag_p.get_text(" ").strip() # " " For separating headers from text
                     if txt == "":
                         continue
                     tag2 = tag.find_next("h1")
-                    txt2 = tag2.get_text().strip()
+                    txt2 = tag2.get_text(" ").strip()
                     idx = txt.find(txt2)
                     if idx != -1:
                         txt = txt[:idx]
@@ -275,11 +275,11 @@ def read_spl_data(file_name):
                     except:
                         continue
                     #txt = tag_p.string.replace("  ", " ").replace("\t"," ").replace("\n","")
-                    txt = tag_p.get_text().strip()
+                    txt = tag_p.get_text(" ").strip()
                     if txt == "":
                         continue
                     tag2 = tag.find_next("h1")
-                    txt2 = tag2.get_text().strip()
+                    txt2 = tag2.get_text(" ").strip()
                     idx = txt.find(txt2)
                     if idx != -1:
                         txt = txt[:idx]

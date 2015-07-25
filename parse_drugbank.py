@@ -336,9 +336,10 @@ def get_drugbank_id_from_name(name, name_to_drug, synonym_to_drug, regex_db_name
     # Try matching drugbank name in the given name
     else:
 	name = name.lower()
-	if not regex_db_name and len(set("[()]") & set(name)) > 0:
-	    return drugbank_id, drugbank_name 
-	exp = re.compile(r"\b%s\b" % name)
+	if not regex_db_name:
+	    if len(set("[()]") & set(name)) > 0:
+		return drugbank_id, drugbank_name 
+	    exp = re.compile(r"\b%s\b" % name)
 	for db_name, db_id in name_to_drug.iteritems():
 	    if len(set("[()]") & set(db_name)) > 0:
 		continue

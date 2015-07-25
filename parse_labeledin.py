@@ -40,6 +40,8 @@ def get_drug_disease_mapping(spl_id_to_cuis, spl_id_to_names, name_to_drug, syno
             continue
 	for name in spl_id_to_names[spl_id]:
 	    # Get drugbank id from name in the label
+	    if name.find(" / ") != -1: # Skip drug combinations
+		continue
 	    drugbank_id, drugbank_name = parse_drugbank.get_drugbank_id_from_name(drug, name_to_drug, synonym_to_drug, regex_db_name = True)
 	    if drugbank_id is not None:
 		break
