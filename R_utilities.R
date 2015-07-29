@@ -112,6 +112,7 @@ draw.histogram<-function(d, variable, x.lab, y.lab, binwidth=NULL, x.scale=NULL,
     p = add.theme(p, no.background=F, text.size=text.size)
 
     print.plot(p, out.file)
+    print(variable)
     print(summary(d[[variable]]))
     return(p)
 }
@@ -135,7 +136,7 @@ draw.scatterplot<-function(d, variable, selected, x.text, y.text, x.log=F, y.log
 	f = paste(selected, "~", variable)
 	m = lm(f, d)
 	r2 = format(summary(m)$r.squared, digits = 3)
-	print(r2)
+	print(sprintf("R^2: %s", r2))
 	lm_eqn = function(df){
 	    m = lm(y ~ x, df);
 	    eq <- substitute("~~italic(R)^2~"="~r2", #substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2, 
@@ -146,13 +147,13 @@ draw.scatterplot<-function(d, variable, selected, x.text, y.text, x.log=F, y.log
 	}
 	#p = p + geom_text(aes(x = -3, y = 250, label = lm_eqn(d)), parse = TRUE) 
 	#p = p + geom_text(aes(x = -3, y = 250, label = paste("R^2", "=", r2, sep="")), parse = TRUE) 
-	p = p + annotate("text", x = mean(d[[variable]])+1*sd(d[[variable]]), y = mean(d[[selected]])+1*sd(d[[selected]]), label = paste("R^2", "=", r2, sep="")) # -4, 60
+	p = p + annotate("text", x = mean(d[[variable]],na.rm=T)+1*sd(d[[variable]],na.rm=T), y = mean(d[[selected]], na.rm=T)+1*sd(d[[selected]],na.rm=T), label = paste("R^2", "=", r2, sep="")) # -4, 60
     }
     p = p + labs(x=x.text, y=y.text) 
     p = add.theme(p, no.background = T)
     print.plot(p, out.file)
     a = cor.test(d[,variable], d[,selected], method="spearman")
-    print(c(a$estimate, a$p.value))
+    print(sprintf("Cor.test: %.3f %e", a$estimate, a$p.value))
     return(p)
 }
 
