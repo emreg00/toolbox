@@ -1,7 +1,5 @@
 import urllib2, os, cPickle
 from bs4 import BeautifulSoup
-from diseasome.src import diseasome
-from xml.etree.ElementTree import iterparse
 import time
 
 def main():
