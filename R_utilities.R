@@ -13,6 +13,9 @@ library(beanplot)
 cbPalette <- c("blue", "red", "green", "grey20", "orange", "blue") #c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 cbPalette2 <- rep(c("blue", "red"), 20) 
 cbPalette3 <- brewer.pal(9,"Blues")
+cbPalette.set <- brewer.pal(8,"Set1")
+cbPalette.pastel <- brewer.pal(8,"Pastel1")
+cbPalette.accent <- brewer.pal(8,"Accent")
 
 ### Analytical functions
 get.z.score<-function(val, values) {
@@ -162,7 +165,7 @@ draw.violinplot<-function(d, variable, value, x.lab, y.lab, y.log=F, out.file=NU
     if(y.log == T) {
 	d[,value] = log10(d[[value]])
     }
-    p = ggplot(data=d, aes_string(x=variable, y=value)) + geom_violin(alpha=0.5, color="gray") + geom_jitter(alpha=0.5, aes_string(color=variable), position = position_jitter(width = 0.1)) + stat_summary(fun.y="median", geom='point', color='black', size=10) + coord_flip() + scale_color_manual(values=cbPalette2) 
+    p = ggplot(data=d, aes_string(x=variable, y=value)) + geom_violin(alpha=0.5, color="gray") + geom_jitter(alpha=0.5, aes_string(color=variable), position = position_jitter(width = 0.1)) + stat_summary(fun.y="median", geom='point', color='black', size=10, alpha=0.5) + coord_flip() + scale_color_manual(values=cbPalette.set) 
     p = p + labs(y = y.lab, x="") + guides(color=F) 
     p = add.theme(p)
 
