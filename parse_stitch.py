@@ -66,6 +66,36 @@ def get_inchikey_to_targets(links_file, mapping_file, gene_mapping_file, output_
     f_out.close()
     return inchi_to_targets
 
+def get_cid_to_drugbank_id_mapping(mapping_file, output_file=None):
+    if output_file is not None and os.path.exists(output_file):
+	cid_to_drugbank_ids = cPickle.load(open(output_file))
+	return cid_to_drugbank_ids 
+    # Get stitch stereo id to drugbank id mapping
+    f = gzip.open(mapping_file)
+    line = f.readline()
+    cid_to_drugbank_ids = {} 
+    for line in f:
+        #chemical    alias   source(s)
+        words = line.strip().split("\t")
+        stereo_id = words[0]
+        alias = words[1] 
+        sources = words[2].split()
+        flag = False
+        if alias.startswith("DB"):
+            for source in sources:
+                if source == "DrugBank":
+                    cid_to_drugbank_ids.setdefault(stereo_id, set()).add(alias)
+                    flag = True
+                    break
+            if flag == False:
+                print words 
+    f.close()
+    if output_file is not None:
+        f_out = open(output_file, 'w')
+        cPickle.dump(cid_to_drugbank_ids, f_out)
+        f_out.close()
+    return cid_to_drugbank_ids 
+
 
 if __name__ == "__main__":
     main()
