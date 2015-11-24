@@ -989,10 +989,12 @@ def get_degree_equivalents(seeds, bins, g):
     return seed_to_nodes
 
 
-def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random, degree_aware=True, connected=False):
+def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random, degree_aware=True, connected=False, seed=None):
     """
     Use get_degree_binning to get bins
     """
+    if seed is not None:
+	random.seed(seed)
     values = []
     nodes = network.nodes()
     for i in xrange(n_random):
@@ -1093,7 +1095,7 @@ def get_connected_components(G, return_as_graph_list=True):
     if return_as_graph_list:
         result_list = networkx.connected_component_subgraphs(G)
     else:
-        result_list = networkx.connected_components(G)
+	result_list = [c for c in sorted(networkx.connected_components(G), key=len, reverse=True)]
 
     return result_list
 

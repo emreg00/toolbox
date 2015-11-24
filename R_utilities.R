@@ -459,7 +459,8 @@ convert.probe.to.gene.expression<-function(expr, gene.mapping, selection.functio
     gene.mapping = factor(gene.mapping[,"Gene"])
     if(is.null(selection.function)) {
 	selection.function<-function(asample){ # max
-	   return(tapply(abs(asample), gene.mapping, max)) #mean)) 
+	   #return(tapply(abs(asample), gene.mapping, max)) #mean)) 
+       return(tapply(col.values, mapping, function(x) { x[which.max(abs(x))] }))
 	}
 	#variances = apply(expr, 1, var)
 	#get.max<-function(e) {
