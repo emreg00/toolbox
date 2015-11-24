@@ -6,7 +6,6 @@ It contains generic utilities for data processing (e.g., parsing, network-based 
 The code here has been developed during the analysis of data in various projects such as
 - [BIANA](http://github.com/emreg00/biana) ([@javigx2](https://twitter.com/javigx2) was the lead developer)
 - [GUILD](http://github.com/GUILD)
-<- PEPPER: PErsonalized Perturbation ProfilER>
 - Proximity: A method to calculate distances between two groups of nodes in the network while correcting for degree biases (e.g., incompleteness or study bias).
 
 The package mainly consists of two types of files:
@@ -27,15 +26,15 @@ Below are the relevant methods in [network_utilities.py](network_utilities.py) f
 
 - Creating node bins by degree:
 
-  bins = get_degree_binning(network, min_bin_size)
+    bins = get_degree_binning(network, min_bin_size)
   
 - Selecting nodes randomly matching the degrees of the nodes in the given set:
 
-  nodes_random = pick_random_nodes_matching_selected(network, bins, nodes, n_random, degree_aware)
+    nodes_random = pick_random_nodes_matching_selected(network, bins, nodes, n_random, degree_aware)
 
 - Calculating average distance from the nodes in nodes_from to the closest node in the nodes_to (lengths is the dictionary containing all pairwise shortest path distances, distance="closest", parameters={}):
 
-  d = get_separation(network, lengths, nodes_from, nodes_to, distance, parameters)
+    d = get_separation(network, lengths, nodes_from, nodes_to, distance, parameters)
 
 
 
