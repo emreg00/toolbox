@@ -18,7 +18,7 @@ and [network_utilities.py](network_utilities.py) contains methods related to net
 ## Proximity
 
 ### Proximity analysis
-To replicate the analysis in the paper please refer to [proximity.ipynb](http://github.com/emreg00/proximity/proximity.ipynb).
+To replicate the analysis in the paper please refer to [proximity](http://github.com/emreg00/proximity) repository.
 
 ### Proximity calculation
 For calculating proximity, the inputs are: node_set_1, node_set_2 and network. 
