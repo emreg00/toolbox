@@ -15,8 +15,12 @@ The package mainly consists of two types of files:
 For instance, [parse_drugbank.py](parse_drugbank.py) contains methods to parse DrugBank data base (v.3) XML dump 
 and [network_utilities.py](network_utilities.py) contains methods related to network generation and analysis. 
 
-### Proximity
+## Proximity
 
+### Proximity analysis
+To replicate the analysis in the paper please refer to [proximity.ipynb](http://github.com/proximity/proximity.ipynb).
+
+### Proximity calculation
 For calculating proximity, the inputs are: node_set_1, node_set_2 and network. 
 The nodes in the network are binned such that the nodes in the same bin have similar degrees. 
 Next, random nodes matching the number and the degree of the nodes in the node sets are chosen.
