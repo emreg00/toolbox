@@ -5,7 +5,7 @@ It contains generic utilities for data processing (e.g., parsing, network-based 
 
 The code here has been developed during the analysis of data in various projects such as
 - [BIANA](http://github.com/emreg00/biana) ([@javigx2](https://twitter.com/javigx2) was the lead developer)
-- [GUILD](http://github.com/GUILD)
+- [GUILD](http://github.com/emreg00/guild)
 - Proximity: A method to calculate distances between two groups of nodes in the network while correcting for degree biases (e.g., incompleteness or study bias).
 
 The package mainly consists of two types of files:
@@ -18,7 +18,7 @@ and [network_utilities.py](network_utilities.py) contains methods related to net
 ## Proximity
 
 ### Proximity analysis
-To replicate the analysis in the paper please refer to [proximity.ipynb](http://github.com/proximity/proximity.ipynb).
+To replicate the analysis in the paper please refer to [proximity.ipynb](http://github.com/emreg00/proximity/proximity.ipynb).
 
 ### Proximity calculation
 For calculating proximity, the inputs are: node_set_1, node_set_2 and network. 
