@@ -1,5 +1,5 @@
-import network_utilities, parse_msigdb
-import csv
+import network_utilities, parse_msigdb, stat_utilities
+import csv, numpy, os, cPickle
 
 def get_network(network_file, only_lcc):
     network = network_utilities.create_network_from_sif_file(network_file, use_edge_data = False, delim = None, include_unconnected=True)
@@ -11,11 +11,14 @@ def get_network(network_file, only_lcc):
     return network
 
 
-def get_expression_info(gexp_file, process=None, delim=',', quote='"'):
+def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file=None):
     """
     To get gene expression info
     process: a set(["log2", "z", "abs"]) or None
     """
+    if dump_file is not None and os.path.exists(dump_file):
+	gexp, gene_to_idx, cell_line_to_idx = cPickle.load(open(dump_file))
+	return gexp, gene_to_idx, cell_line_to_idx
     #gene_to_values = {}
     f = open(gexp_file)
     reader = csv.reader(f, delimiter=delim, quotechar=quote)
@@ -43,6 +46,9 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"'):
 	#print gexp.shape, gexp_norm.shape
 	#print gexp[0,0], gexp_norm[0,0]
 	#return gene_to_values, cell_line_to_idx
+    if dump_file is not None:
+	values = gexp, gene_to_idx, cell_line_to_idx
+	cPickle.dump(values, open(dump_file, 'w')) 
     return gexp, gene_to_idx, cell_line_to_idx
 
 
@@ -55,7 +61,9 @@ def get_pathway_info(pathway_file, prefix=None, nodes=None):
     if nodes is not None:
 	pathway_to_geneids_mod = {}
 	for pathway, geneids in pathway_to_geneids.iteritems():
-	    pathway_to_geneids_mod[key] = pathway_to_geneids[key] & nodes
+	    geneids_mod = geneids & nodes
+	    if len(geneids_mod) > 0:
+		pathway_to_geneids_mod[pathway] = geneids_mod 
 	pathway_to_geneids = pathway_to_geneids_mod
     return pathway_to_geneids
 
