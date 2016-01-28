@@ -28,7 +28,7 @@ def read_repurposing_data(file_name):
 	for tag_p in tag.find_all_next():
 	    try:
 		if tag_p.name == "td": 
-		    if tag_p.class is not None and tag_p.class.startswith("recaptcha"):
+		    if tag_p['class'] is not None and tag_p['class'].startswith("recaptcha"):
 			flag = True
 			break
 	    except:
