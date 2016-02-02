@@ -1,48 +1,45 @@
-#import urllib2, os, cPickle, re, time
+##############################################################################
+# DrugRepurposing.info parser
+#
+# eg 22/01/2016
+##############################################################################
+
 from bs4 import BeautifulSoup
-#from toolbox import text_utilities
 
 def main():
-    #drug = "montelukast" 
-    #disease = "type 2 diabetes mellitus"
-    #disease = "asthma"
-    base_dir = "~/Dropbox/sbnb/"
-    name, indication = read_repurposing_data(base_dir + "Drug Repurposing Info.html")
-    print name
-    print indication
+    base_dir = "/Users/eguney/Dropbox/sbnb/"
+    drug_to_values = read_repurposing_data(base_dir + "Drug Repurposing Info.html")
+    print len(drug_to_values), drug_to_values 
     return 
 
 
 def read_repurposing_data(file_name):
-    drug_to_values = {}
-    #name = None
-    #indication = [] 
+    drug_to_values = []
     html_doc = open(file_name)
-    soup = BeautifulSoup(html_doc, "xml")
-    #name = tag.strong.string.encode("ascii", "ignore")
+    soup = BeautifulSoup(html_doc, "lxml")
     flag = False
-    for tag in soup.find_all('tr'):
-        #print tag.name 
-	if flag:
+    for i, tag in enumerate(soup.find_all('tr')):
+	#print i, tag.name 
+	values = []
+	for tag_p in tag.descendants:
+	    #print tag_p.name 
+	    if tag_p.name == "td": 
+		if tag_p.get('class') is not None and tag_p['class'][0].startswith("recaptcha"):
+		    flag = True
+		    break
+	    if tag_p.name == "input":
+		val = tag_p.get('value')
+		values.append(val)
+	    if tag_p.name == "option" and tag_p.get('selected') is not None:
+		val = str(tag_p.get_text())
+		#val = val.encode("ascii", "ignore")
+		values.append(val)
+	if flag: # or i>10: 
 	    break
-	for tag_p in tag.find_all_next():
-	    try:
-		if tag_p.name == "td": 
-		    if tag_p['class'] is not None and tag_p['class'].startswith("recaptcha"):
-			flag = True
-			break
-	    except:
-		print tag.name, tag_p.name
-		continue
-	    txt = tag_p.get_text(" ").strip() # " " For separating headers from text
-	    if txt == "":
-		continue
-	    txt = " ".join(txt.split()) 
-	    txt = txt.encode("ascii", "ignore")
-	    if txt == "":
-		continue
-	    #for i, tag_p in enumerate(tag.next_siblings):
-    return drug_to_values #name, indication 
+	print values
+	if len(values) > 0:
+	    drug_to_values.append(values[:-1])
+    return drug_to_values  
     
 	
 if __name__ == "__main__":
