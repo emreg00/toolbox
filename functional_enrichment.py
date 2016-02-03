@@ -1,5 +1,8 @@
 try:
-    from external.funcassociate import client
+    #from external.funcassociate import client
+    #from funcassociate import client
+    from func_associate import func_associate as client
+    #import func_associate as client
 except:
     client = None
     print "Import error: Funcassociate. Make sure that funcassociate is in toolbox!"
@@ -38,7 +41,7 @@ def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_metho
     else:
 	raise ValueError("Unrecognized id_type: %s" % id_type)
 
-    reps = 1500
+    reps = 2000
     client_funcassociate = client.FuncassociateClient()
     response = client_funcassociate.functionate(query = subset_gene_ids,
                              species = species,
