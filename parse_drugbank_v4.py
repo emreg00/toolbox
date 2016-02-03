@@ -1,14 +1,15 @@
 ##############################################################################
-# DrugBank XML parser to parse targets of drugs
+# DrugBank v4.3 XML parser
 #
-# eg 10/11/2011
+# eg 15/01/2016
 ##############################################################################
 
 from xml.etree.ElementTree import iterparse
 import re, math
 
 def main():
-    drugbank_file = "../data/drugbank.xml" # test.xml
+    base_dir = "/Users/eguney/Dropbox/sbnb/"
+    drugbank_file = base_dir + "drugbank.xml" # test.xml
     get_drugs_for_targets(drugbank_file, "drugs.txt")
     return
     drugs_file = None #"drugs.txt"
@@ -178,198 +179,6 @@ class DrugBankXMLParser(object):
 		synonym_to_drug[brand.lower()] = drug
 	return name_to_drug, synonym_to_drug
 
-
-def get_drugs_by_group(parser, groups_to_include = set(["approved"]), groups_to_exclude=set(["withdrawn"])):
-    selected_drugs = set()
-    for drugbank_id, name in parser.drug_to_name.iteritems():
-	# Consider only approved drugs
-	if drugbank_id not in parser.drug_to_groups:
-	    continue
-	groups = parser.drug_to_groups[drugbank_id]
-	#if "approved" not in groups or "withdrawn" in groups: 
-	if len(groups & groups_to_include) == 0:
-	    continue
-	if len(groups & groups_to_exclude) > 0:
-	    continue
-	selected_drugs.add(drugbank_id)
-    return selected_drugs
-
-
-def get_disease_specific_drugs(parser, selected_drugs, phenotypes):
-    import text_utilities
-    disease_to_drugs = {}
-    indication_to_diseases = {}
-    for drug, indication in parser.drug_to_indication.iteritems():
-	if drug not in selected_drugs:
-	    continue
-	if indication is None:
-	    continue
-	#if any(map(lambda x: x is not None, [ exp.search(indication) for exp in exps ])):
-	    #disease = keywords[0]
-	    #disease_to_drugs.setdefault(disease, set()).add(drug)
-	#for disease, exp in zip(phenotypes, exps):
-	#    if exp.search(indication.lower()) is not None:
-	#	disease_to_drugs.setdefault(disease, set()).add(drug)
-	indication = indication.lower()
-	for disease in phenotypes:
-	    #if all([ indication.find(word.strip()) != -1 for word in disease.split(",") ]):
-	    #	disease_to_drugs.setdefault(disease, set()).add(drug)
-	    values = text_utilities.tokenize_disease_name(disease)
-	    #print disease, values
-	    if all([ indication.find(word.strip()) != -1 for word in values ]):
-		#print disease, drug
-		disease_to_drugs.setdefault(disease, set()).add(drug)
-		indication_to_diseases.setdefault(indication, set()).add(disease)
-	    else:
-		indication_to_diseases.setdefault(indication, set())
-    # Print non-matching indications #!
-    for indication, diseases in indication_to_diseases.iteritems():
-	if len(diseases) == 0:
-	    continue
-	    print indication.encode('ascii','ignore')
-	elif indication.find(" not ") != -1 or indication.find(" except ") != -1:
-	    continue
-	    print diseases, indication.encode('ascii','ignore')
-    #print disease_to_drugs["diabetes mellitus, type 2"] 
-    return disease_to_drugs
-
-
-def get_drugs_for_targets(file_name, output_file):
-    parser = DrugBankXMLParser(file_name)
-    parser.parse()
-    uniprot_to_drugs = {}
-    for drug, targets in parser.drug_to_targets.iteritems():
-	#print drug
-	for uniprot in targets:
-	    uniprot_to_drugs.setdefault(uniprot, set()).add(drug)
-    f = open(output_file, 'w')
-    for uniprot, drugs in uniprot_to_drugs.iteritems():
-	f.write("%s\t%s\n" % (uniprot, ";".join(drugs)))
-    f.close()
-    return
-
-def output_drug_info(file_name, output_file):
-    parser = DrugBankXMLParser(file_name)
-    parser.parse()
-    f = open(output_file, 'w')
-    f.write("drugbank id\tname\tgroups\tpubchem id\tdescription\tindication\ttargets\n")
-    for drug, name in parser.drug_to_name.iteritems():
-        name = name.encode('ascii','ignore')
-        try:
-            groups = parser.drug_to_groups[drug]
-        except:
-            groups = []
-        try:
-            description = parser.drug_to_description[drug]
-            description = description.replace("\n", "").encode('ascii','ignore')
-        except:
-            description = ""
-        try:
-            indication = parser.drug_to_indication[drug]
-            indication = indication.replace("\n", "").encode('ascii','ignore')
-        except:
-            #print drug
-            indication = ""
-	if drug in parser.drug_to_pubchem:
-            pubchem = parser.drug_to_pubchem[drug]
-        else:
-	    pubchem = "" 
-        if drug in parser.drug_to_targets:
-            targets = parser.drug_to_targets[drug]
-        else:
-            targets = []
-        try:
-            f.write("%s\t%s\t%s\t%s\t%s\t%s\t%s\n" % (drug, name, ";".join(groups), pubchem, description, indication, ";".join(targets)))
-        except:
-            print drug, name, groups, pubchem, description, indication, targets
-            return
-    f.close()
-    return
-
-def get_drug_info(drug_info_file):
-    drug_to_values = {}
-    f = open(drug_info_file)
-    header = f.readline().strip().split("\t")
-    col_to_idx = dict((k, i) for i, k in enumerate(header[1:]))
-    for line in f:
-        words = line.strip("\n").split("\t")
-        drug_to_values[words[0]] = words[1:]
-    return col_to_idx, drug_to_values
-
-
-def get_drug_targets(file_name, drugs_file=None):
-    parser = DrugBankXMLParser(file_name)
-    parser.parse()
-    drugs = None
-    if drugs_file is not None:
-	drugs = set([ line.strip().lower() for line in open(drugs_file) ])
-	#exp = re.compile("brain")
-	#exp2 = re.compile("metastasis")
-	for drug, description in parser.drug_to_description.iteritems():
-	    #drug = drug.lower()
-	    if description is None:
-		continue
-	    #m = exp.search(description)
-	    #m2 = exp2.search(description)
-	    if True: # m is not None and m2 is not None:
-		drugs.add(drug)
-	for drug, indication in parser.drug_to_indication.iteritems():
-	    #drug = drug.lower()
-	    if indication is None:
-		continue
-	    #m = exp.search(indication)
-	    #m2 = exp2.search(indication)
-	    if True: # m is not None and m2 is not None:
-		drugs.add(drug)
-	#print drugs
-
-    drug_to_targets = {}
-    for drug, partner_ids in parser.drug_to_partner_ids.iteritems():
-	#drug = drug.lower()
-	if drugs is not None and drug not in drugs: 
-	    continue
-	#print drug
-	for partner_id in partner_ids:
-	    gene = parser.partner_id_to_gene[partner_id]
-	    if gene is None:
-		continue
-	    drug_to_targets.setdefault(drug, set()).add(gene)
-    return drug_to_targets, parser.drug_to_description, parser.drug_to_indication
-
-def output_drug_targets(drug_to_targets):
-    f = open("drug_to_targets.txt", 'w')
-    f2 = open("drug_targets.txt", 'w')
-    for drug, targets in drug_to_targets.iteritems():
-	f.write("%s\t%s\n" % (drug, "\t".join(targets)))
-	f2.write("%s\n" % "\n".join(targets))
-    f.close()
-    f2.close()
-    return
-
-def score_drugs_by_target_score(drug_to_targets, scores_file, output_file):
-    gene_to_score = dict([ line.strip().split() for line in open(scores_file)])
-    values = []
-    for drug, targets in drug_to_targets.iteritems():
-	scores = []
-	for target in targets:
-	    if target in gene_to_score:
-		scores.append(float(gene_to_score[target]))
-	if len(scores) == 0:
-	    continue
-	values.append((calculate_score(scores), drug))
-    values.sort()
-    values.reverse()
-    f = open(output_file, 'w')
-    for score, drug in values:
-	f.write("%s\t%s\n" % (drug, str(score)))
-    f.close()
-    return 
-
-def calculate_drug_score_from_targets(values):
-    val = 0.0
-    for value in values:
-	val += value * value
-    return math.sqrt(val)
 
 if __name__ == "__main__":
     main()
