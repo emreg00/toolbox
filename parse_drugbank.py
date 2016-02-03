@@ -77,10 +77,13 @@ class DrugBankXMLParser(object):
 		    if state_stack[-2] == self.NS+"targets":
 			current_target = elem.attrib["partner"]
 	    if event == "end":
-		if elem.tag == self.NS+"name":
+		if elem.tag == self.NS+"drugbank-id":
+		    if state_stack[-2] == self.NS+"drug":
+			drug_id = elem.text
+		elif elem.tag == self.NS+"name":
 		    if state_stack[-2] == self.NS+"drug":
 			self.drug_to_name[drug_id] = elem.text
-		if elem.tag == self.NS+"brand":
+		elif elem.tag == self.NS+"brand":
 		    if state_stack[-2] == self.NS+"brands" and state_stack[-3] == self.NS+"drug":
 			brand = elem.text
 			#idx = brand.find("(")
@@ -92,7 +95,7 @@ class DrugBankXMLParser(object):
 			brand = brand.strip().encode('ascii','ignore')
 			if brand != "":
 			    self.drug_to_brands.setdefault(drug_id, set()).add(brand) 
-		if elem.tag == self.NS+"synonym":
+		elif elem.tag == self.NS+"synonym":
 		    if state_stack[-2] == self.NS+"synonyms" and state_stack[-3] == self.NS+"drug":
 			synonym = elem.text
 			#idx = synonym.find("(")
@@ -104,9 +107,6 @@ class DrugBankXMLParser(object):
 			synonym = synonym.strip().encode('ascii','ignore')
 			if synonym != "":
 			    self.drug_to_synonyms.setdefault(drug_id, set()).add(synonym) 
-		if elem.tag == self.NS+"drugbank-id":
-		    if state_stack[-2] == self.NS+"drug":
-			drug_id = elem.text
 		elif elem.tag == self.NS+"description":
 		    if state_stack[-2] == self.NS+"drug":
 			self.drug_to_description[drug_id] = elem.text
