@@ -8,19 +8,24 @@ from xml.etree.ElementTree import iterparse
 import re, math
 
 def main():
-    #base_dir = "/Users/eguney/Dropbox/sbnb/"
+    base_dir = "../data/drugbank/"
     #file_name = base_dir + "drugbank.xml" 
-    base_dir = "/home/eguney/data/drugbank/"
     file_name = base_dir + "test.xml"
     parser = DrugBankXMLParser(file_name)
     parser.parse()
-    uniprot_to_drugs = {}
-    for drug, target_to_action in parser.drug_to_target_to_action.iteritems():
-	#print drug
-	for uniprot in target_to_action:
-	    #print uniprot
-	    uniprot_to_drugs.setdefault(uniprot, set()).add(drug)
-    print uniprot_to_drugs
+    drug = "DB00843"
+    target = "BE0000426" #"BE0004796" #"P22303"
+    for i in dir(parser):
+	print i
+	if i.startswith("drug"):
+	    d = getattr(parser, i)
+	    if drug in d: print d[drug]
+	elif i.startswith("target"):
+	    d = getattr(parser, i)
+	    if target in d: print d[target]
+    print parser.drug_to_target_to_actions
+    drug_to_uniprots = parser.get_targets(only_paction=False)
+    print drug_to_uniprots
     return
 
 
@@ -46,12 +51,12 @@ class DrugBankXMLParser(object):
 	self.drug_to_kegg = {}
 	self.drug_to_kegg_compound = {}
 	self.drug_to_pharmgkb = {}
-	self.drug_to_target_to_action = {}
-	self.drug_to_targets_paction = {} 
+	self.drug_to_target_to_actions = {} # drug - target - (known action, [action types])
         self.drug_to_categories = {}
         self.drug_to_atc_codes = {}
         self.drug_to_inchi_key = {}
         self.drug_to_smiles = {}
+	self.target_to_name = {}
 	self.target_to_gene = {}
 	self.target_to_uniprot = {}
 	return
@@ -110,6 +115,8 @@ class DrugBankXMLParser(object):
 			brand = brand.strip().encode('ascii','ignore')
 			if brand != "":
 			    self.drug_to_brands.setdefault(drug_id, set()).add(brand) 
+		    elif state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
+			self.target_to_name[current_target] = elem.text 
 		elif elem.tag == self.NS+"description":
 		    if state_stack[-2] == self.NS+"drug":
 			self.drug_to_description[drug_id] = elem.text
@@ -148,19 +155,22 @@ class DrugBankXMLParser(object):
 		elif elem.tag == self.NS+"id":	
 		    if state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
 			current_target = elem.text
-			d = self.drug_to_target_to_action.setdefault(drug_id, {})
-			d[current_target] = "unknown"
+			d = self.drug_to_target_to_actions.setdefault(drug_id, {})
+			d[current_target] = [False, []]
 			#print current_target 
 		elif elem.tag == self.NS+"action":	
 		    if state_stack[-3] == self.NS+"target" and state_stack[-2] == self.NS+"actions":
-			self.drug_to_target_to_action[drug_id][current_target] = elem.text
+			self.drug_to_target_to_actions[drug_id][current_target][1].append(elem.text)
 		elif elem.tag == self.NS+"known-action":
 		    if state_stack[-2] == self.NS+"target":
 			if elem.text == "yes":
-			    self.drug_to_targets_paction.setdefault(drug_id, set()).add(current_target)
+			    self.drug_to_target_to_actions[drug_id][current_target][0] = True
+			    if len(self.drug_to_target_to_actions[drug_id][current_target][1]) == 0:
+				#print "Inconsistency with target action: %s %s" % (drug_id, current_target)
+				pass
 		elif elem.tag == self.NS+"gene-name":
-		    if state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
-			self.target_to_gene[current_target] = elem.text
+		    if state_stack[-3] == self.NS+"target" and state_stack[-2] == self.NS+"polypeptide":
+			self.target_to_gene[current_target] = elem.text 
 		elif elem.tag == self.NS+"kind":
 		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
                         current_property = elem.text # InChIKey or SMILES
@@ -197,24 +207,32 @@ class DrugBankXMLParser(object):
 		elem.clear()
 		state_stack.pop()
 	root.clear()
-	print self.drug_to_target_to_action #!
-	print self.target_to_uniprot #!
+	return 
+
+    
+    def get_targets(self, only_paction=False):
         # Map target ids to uniprot ids
-	drug_to_target_uniprots = {}
-	drug_to_target_uniprots_paction = {}
-        for drug, target_to_action in self.drug_to_target_to_action.iteritems():
-            for target, action in target_to_action.iteritems():
+	drug_to_uniprots = {}
+        for drug, target_to_actions in self.drug_to_target_to_actions.iteritems():
+            for target, actions in target_to_actions.iteritems():
                 try:
                     uniprot = self.target_to_uniprot[target]
                 except:
                     # drug target has no uniprot
+		    #print "No uniprot information for", target 
                     continue
-                drug_to_target_uniprots.setdefault(drug, set()).add(uniprot)
-		if drug in self.drug_to_targets_paction and target in self.drug_to_targets_paction[drug]:
-		    drug_to_target_uniprots_paction.setdefault(drug, set()).add(uniprot)
-	self.drug_to_target_to_action = drug_to_target_uniprots
-	self.drug_to_targets_paction = drug_to_target_uniprots_paction
-	return 
+		if only_paction:
+		    flag = False
+		    for known, action in actions:
+			if known:
+			    flag = True
+			    break
+		    if flag:
+			drug_to_uniprots.setdefault(drug, set()).add(uniprot)
+		else:
+		    drug_to_uniprots.setdefault(drug, set()).add(uniprot)
+	return drug_to_uniprots
+
 
     def get_synonyms(self, selected_drugs=None):
 	name_to_drug = {}

@@ -7,7 +7,7 @@
 from bs4 import BeautifulSoup
 
 def main():
-    base_dir = "~/Dropbox/sbnb/"
+    base_dir = "../data/"
     drug_to_values = read_repurposing_data(base_dir + "Drug Repurposing Info.html")
     print len(drug_to_values), drug_to_values 
     return 
