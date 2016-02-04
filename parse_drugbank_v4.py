@@ -23,8 +23,8 @@ def main():
 	elif i.startswith("target"):
 	    d = getattr(parser, i)
 	    if target in d: print d[target]
-    print parser.drug_to_target_to_actions
-    drug_to_uniprots = parser.get_targets(only_paction=False)
+    print parser.drug_to_target_to_values
+    drug_to_uniprots = parser.get_targets(target_types = set(["target", "enzyme"]), only_paction=False)
     print drug_to_uniprots
     return
 
@@ -51,7 +51,7 @@ class DrugBankXMLParser(object):
 	self.drug_to_kegg = {}
 	self.drug_to_kegg_compound = {}
 	self.drug_to_pharmgkb = {}
-	self.drug_to_target_to_actions = {} # drug - target - (known action, [action types])
+	self.drug_to_target_to_values = {} # drug - target - (type {target / enzyme / transporter / carrier}, known action, [action types])
         self.drug_to_categories = {}
         self.drug_to_atc_codes = {}
         self.drug_to_inchi_key = {}
@@ -74,6 +74,8 @@ class DrugBankXMLParser(object):
 	current_target = None
 	resource = None
         current_property = None 
+	target_types = set(map(lambda x: self.NS+x, ["target", "enzyme", "carrier", "transporter"]))
+	target_types_plural = set(map(lambda x: x+"s", target_types))
 	for (event, elem) in context:
 	    if event == "start":
 		state_stack.append(elem.tag)
@@ -86,9 +88,9 @@ class DrugBankXMLParser(object):
 		    resource = None
 		elif elem.tag == self.NS+"property":
                     current_property = None
-		elif elem.tag == self.NS+"target": 
-		    if state_stack[-2] == self.NS+"targets":
-			current_target = None #elem.attrib["partner"]
+		elif elem.tag in target_types: 
+		    if state_stack[-2] in target_types_plural: 
+			current_target = None 
 	    if event == "end":
 		if elem.tag == self.NS+"drugbank-id":
 		    if state_stack[-2] == self.NS+"drug":
@@ -115,7 +117,8 @@ class DrugBankXMLParser(object):
 			brand = brand.strip().encode('ascii','ignore')
 			if brand != "":
 			    self.drug_to_brands.setdefault(drug_id, set()).add(brand) 
-		    elif state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
+		    #elif state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
+		    elif state_stack[-3] in target_types_plural and state_stack[-2] in target_types:
 			self.target_to_name[current_target] = elem.text 
 		elif elem.tag == self.NS+"description":
 		    if state_stack[-2] == self.NS+"drug":
@@ -153,23 +156,23 @@ class DrugBankXMLParser(object):
 		    if state_stack[-2] == self.NS+"atc-codes":
 			self.drug_to_atc_codes.setdefault(drug_id, set()).add(elem.attrib["code"])
 		elif elem.tag == self.NS+"id":	
-		    if state_stack[-3] == self.NS+"targets" and state_stack[-2] == self.NS+"target":
+		    if state_stack[-3] in target_types_plural and state_stack[-2] in target_types:
 			current_target = elem.text
-			d = self.drug_to_target_to_actions.setdefault(drug_id, {})
-			d[current_target] = [False, []]
+			d = self.drug_to_target_to_values.setdefault(drug_id, {})
+			d[current_target] = [state_stack[-2], False, []]
 			#print current_target 
 		elif elem.tag == self.NS+"action":	
-		    if state_stack[-3] == self.NS+"target" and state_stack[-2] == self.NS+"actions":
-			self.drug_to_target_to_actions[drug_id][current_target][1].append(elem.text)
+		    if state_stack[-3] in target_types and state_stack[-2] == self.NS+"actions":
+			self.drug_to_target_to_values[drug_id][current_target][2].append(elem.text)
 		elif elem.tag == self.NS+"known-action":
-		    if state_stack[-2] == self.NS+"target":
+		    if state_stack[-2] == target_types:
 			if elem.text == "yes":
-			    self.drug_to_target_to_actions[drug_id][current_target][0] = True
-			    if len(self.drug_to_target_to_actions[drug_id][current_target][1]) == 0:
+			    self.drug_to_target_to_values[drug_id][current_target][1] = True
+			    if len(self.drug_to_target_to_values[drug_id][current_target][2]) == 0:
 				#print "Inconsistency with target action: %s %s" % (drug_id, current_target)
 				pass
 		elif elem.tag == self.NS+"gene-name":
-		    if state_stack[-3] == self.NS+"target" and state_stack[-2] == self.NS+"polypeptide":
+		    if state_stack[-3] in target_types and state_stack[-2] == self.NS+"polypeptide":
 			self.target_to_gene[current_target] = elem.text 
 		elif elem.tag == self.NS+"kind":
 		    if state_stack[-3] == self.NS+"calculated-properties" and state_stack[-2] == self.NS+"property":
@@ -188,7 +191,7 @@ class DrugBankXMLParser(object):
 			resource = elem.text 
 		elif elem.tag == self.NS+"identifier":
 		    if state_stack[-3] == self.NS+"external-identifiers" and state_stack[-2] == self.NS+"external-identifier":
-			if state_stack[-5] == self.NS+"target" and state_stack[-4] == self.NS+"polypeptide":
+			if state_stack[-5] in target_types and state_stack[-4] == self.NS+"polypeptide":
 			    if resource == "UniProtKB":
 				self.target_to_uniprot[current_target] = elem.text
 			elif state_stack[-4] == self.NS+"drug":
@@ -210,26 +213,27 @@ class DrugBankXMLParser(object):
 	return 
 
     
-    def get_targets(self, only_paction=False):
+    def get_targets(self, target_types = set(["target"]), only_paction=False):
         # Map target ids to uniprot ids
+	target_types = map(lambda x: self.NS + x, target_types)
 	drug_to_uniprots = {}
-        for drug, target_to_actions in self.drug_to_target_to_actions.iteritems():
-            for target, actions in target_to_actions.iteritems():
+        for drug, target_to_values in self.drug_to_target_to_values.iteritems():
+            for target, values in target_to_values.iteritems():
+		#print target, values
                 try:
                     uniprot = self.target_to_uniprot[target]
                 except:
                     # drug target has no uniprot
 		    #print "No uniprot information for", target 
                     continue
+		target_type, known, actions = values
 		if only_paction:
-		    flag = False
-		    for known, action in actions:
-			if known:
-			    flag = True
-			    break
-		    if flag:
-			drug_to_uniprots.setdefault(drug, set()).add(uniprot)
+		    if known:
+			flag = True
 		else:
+		    if target_type in target_types:
+			flag = True
+		if flag:
 		    drug_to_uniprots.setdefault(drug, set()).add(uniprot)
 	return drug_to_uniprots
 
