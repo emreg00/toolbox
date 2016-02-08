@@ -61,7 +61,7 @@ class DrugBankXMLParser(object):
 	self.target_to_uniprot = {}
 	return
 
-    def parse(self, selected_names=None, exp=None):
+    def parse(self):
 	# get an iterable
 	context = iterparse(self.file_name, ["start", "end"])
 	# turn it into an iterator
@@ -165,7 +165,7 @@ class DrugBankXMLParser(object):
 		    if state_stack[-3] in target_types and state_stack[-2] == self.NS+"actions":
 			self.drug_to_target_to_values[drug_id][current_target][2].append(elem.text)
 		elif elem.tag == self.NS+"known-action":
-		    if state_stack[-2] == target_types:
+		    if state_stack[-2] in target_types:
 			if elem.text == "yes":
 			    self.drug_to_target_to_values[drug_id][current_target][1] = True
 			    if len(self.drug_to_target_to_values[drug_id][current_target][2]) == 0:
@@ -227,6 +227,7 @@ class DrugBankXMLParser(object):
 		    #print "No uniprot information for", target 
                     continue
 		target_type, known, actions = values
+		flag = False
 		if only_paction:
 		    if known:
 			flag = True
@@ -256,6 +257,23 @@ class DrugBankXMLParser(object):
 		    continue
 		synonym_to_drug[brand.lower()] = drug
 	return name_to_drug, synonym_to_drug
+
+
+    def get_drugs_by_group(self, groups_to_include = set(["approved"]), groups_to_exclude=set(["withdrawn"])):
+	selected_drugs = set()
+	for drugbank_id, name in self.drug_to_name.iteritems():
+	    # Consider only approved drugs
+	    if drugbank_id not in self.drug_to_groups:
+		continue
+	    groups = self.drug_to_groups[drugbank_id]
+	    #if "approved" not in groups or "withdrawn" in groups: 
+	    if len(groups & groups_to_include) == 0:
+		continue
+	    if len(groups & groups_to_exclude) > 0:
+		continue
+	    selected_drugs.add(drugbank_id)
+	return selected_drugs
+
 
 
 if __name__ == "__main__":

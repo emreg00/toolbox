@@ -4,6 +4,8 @@ def main():
 
 def get_geneid_symbol_mapping(file_name):
     """
+    wget ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
+    zcat Homo_sapiens.gene_info.gz | cut -f 2,3 > geneid_to_symbol.txt
     To parse Homo_sapiens.gene_info (trimmed to two colums) file from NCBI 
     """
     f = open(file_name)
