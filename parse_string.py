@@ -45,6 +45,23 @@ def get_interactions(links_file, mapping_file, output_file, cutoff = 0, species_
     return 
 
 
+def get_string_id_to_geneid(gene_mapping_file, species_prefix):
+    f = open(gene_mapping_file)
+    line = f.readline()
+    id_to_geneid = {} 
+    for line in f:
+	geneid, stringid = line.strip().split()
+	if not stringid.startswith(species_prefix):
+	    continue
+	if stringid in id_to_geneid: # in case of multiple geneid matches choose lowest
+	    if int(geneid) < int(id_to_geneid[stringid]):
+		id_to_geneid[stringid] = geneid
+	else:
+	    id_to_geneid[stringid] = geneid
+    f.close()
+    return id_to_geneid
+
+
 if __name__ == "__main__":
     main()
 

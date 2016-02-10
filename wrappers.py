@@ -1,5 +1,25 @@
+#######################################################################
+# Recipies / wrapper functions using toolbox methods for disease,
+# drug and network analysis
+# e.g. 10/2015
+#######################################################################
 import network_utilities, parse_msigdb, stat_utilities
+import parse_uniprot, parse_ncbi
 import csv, numpy, os, cPickle
+
+##### Gene info related #####
+
+def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
+    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids)
+    return uniprot_to_geneid
+
+
+def get_geneid_symbol_mapping(mapping_file):
+    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    return geneid_to_names, name_to_geneid
+
+
+##### Network related #####
 
 def get_network(network_file, only_lcc):
     network = network_utilities.create_network_from_sif_file(network_file, use_edge_data = False, delim = None, include_unconnected=True)
@@ -10,6 +30,8 @@ def get_network(network_file, only_lcc):
 	#print len(network.nodes()), len(network.edges())
     return network
 
+
+##### Gene expression related #####
 
 def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file=None):
     """
@@ -52,6 +74,8 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file
     return gexp, gene_to_idx, cell_line_to_idx
 
 
+##### Pathway related #####
+
 def get_pathway_info(pathway_file, prefix=None, nodes=None):
     """
     nodes to filter geneids that are not in the network
@@ -84,6 +108,8 @@ def get_diseasome_genes(diseasome_file, nodes=None):
 	disease_to_category[disease] = category
     return disease_to_genes, disease_to_category
 
+
+##### Statistics related #####
 
 def overlap_significance(geneids1, geneids2, nodes):
     n1, n2 = len(geneids1), len(geneids2)
