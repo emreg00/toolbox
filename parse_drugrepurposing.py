@@ -7,9 +7,13 @@
 from bs4 import BeautifulSoup
 
 def main():
-    base_dir = "../data/"
+    base_dir = "../../data/drugrepurposing.info/"
     drug_to_values = read_repurposing_data(base_dir + "Drug Repurposing Info.html")
-    print len(drug_to_values), drug_to_values 
+    #print len(drug_to_values), drug_to_values 
+    for drug, old, new, name, company, status in drug_to_values: #.iteritems():
+	new = new.lower()
+	if new.find("cardia") != -1 or new.find("heart") != -1 or new.find("ischem") != -1:
+	    print drug, new, status
     return 
 
 
@@ -36,7 +40,7 @@ def read_repurposing_data(file_name):
 		values.append(val)
 	if flag: # or i>10: 
 	    break
-	print values
+	#print values
 	if len(values) > 0:
 	    drug_to_values.append(values[:-1])
     return drug_to_values  
