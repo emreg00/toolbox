@@ -1,10 +1,10 @@
 ###
 # Copied pasted code from previous projects
-# Need to refactor significantly to create indipendent reusable functions
+# Need to refactor significantly to create independent reusable functions
 ###
 
 library(ggplot2)
-library(reshape)
+library(reshape2)
 library(scales)
 library(RColorBrewer)
 library(beanplot)

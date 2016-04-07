@@ -1,5 +1,5 @@
 from toolbox import guild_utilities, selection_utilities
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, average_precision_score
 from selection_utilities import generate_samples_from_list_without_replacement
 import numpy
 
@@ -40,7 +40,18 @@ def get_auc(predictions_true, predictions_false):
     y_scores = numpy.array(predictions) # [0.1, 0.4, 0.35, 0.8]
     y_true = numpy.array(labels) # [0, 0, 1, 1]
     auc = roc_auc_score(y_true, y_scores)
+    #fpr, tpr, thresholds = metrics.roc_curve(y_true, y_scores, pos_label=1)
+    #auc = metrics.auc(fpr, tpr)
     return auc
+
+
+def get_auprc(predictions_true, predictions_false):
+    predictions = predictions_true + predictions_false
+    labels = [ 1 ] * len(predictions_true) + [ 0 ] * len(predictions_false)
+    y_scores = numpy.array(predictions) 
+    y_true = numpy.array(labels) 
+    auprc = average_precision_score(y_true, y_scores)
+    return auprc
 
 
 def balance_predictions(predictions_true, predictions_false, n_random_negative_folds = None, replicable=123):

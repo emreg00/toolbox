@@ -3,11 +3,11 @@
 # drug and network analysis
 # e.g. 10/2015
 #######################################################################
-import network_utilities, parse_msigdb, stat_utilities
+import network_utilities, parse_msigdb, stat_utilities, dict_utilities
 import parse_uniprot, parse_ncbi
 import csv, numpy, os, cPickle
 
-##### Gene info related #####
+##### Id mapping related #####
 
 def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
     uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids)
@@ -62,7 +62,7 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file
 	if "log2" in process:
 	    gexp = numpy.log2(gexp)
 	if "z" in process:
-	    gexp = (gexp - gexp.mean(axis=1)[:, numpy.newaxis]) / gexp.std(axis=1)[:, numpy.newaxis]
+	    gexp = (gexp - gexp.mean(axis=1)[:, numpy.newaxis]) / gexp.std(axis=1, ddof=1)[:, numpy.newaxis]
 	if "abs" in process:
 	    gexp = numpy.abs(gexp)
 	#print gexp.shape, gexp_norm.shape

@@ -1,4 +1,41 @@
+##############################################################################
+# Clinical trials parser
+#
+# eg 2013-2016
+##############################################################################
+
 import cPickle, os, re
+
+def main():
+    #base_dir = "../data/ct/"
+    base_dir = "/home/eguney/data/ct/"
+    file_name = base_dir + "ct.csv"
+    output_data(base_dir, file_name)
+    return
+
+
+def output_data(base_dir, file_name):
+    drug_to_ctids = get_interventions(base_dir, include_other_names=True) #False)
+    print len(drug_to_ctids), drug_to_ctids.items()[:5]
+    ctid_to_conditions = get_ctid_to_conditions(base_dir)
+    print len(ctid_to_conditions), ctid_to_conditions.items()[:5]
+    ctid_to_values = get_ctid_to_details(base_dir) 
+    print len(ctid_to_values), ctid_to_values.items()[:5]
+    f = open(file_name, 'w')
+    f.write("Drug\tClinical trial Id\tPhase\tStatus\tFDA regulated\tWhy stopped\tResults date\tConditions\n")
+
+    for drug, ctids in drug_to_ctids.iteritems():
+	for ctid in ctids:
+	    values = [ drug, ctid ]
+	    if ctid in ctid_to_values:
+		#phase, status, fda_regulated, why_stopped, results_date = ctid_to_values[ctid]
+		values.extend(ctid_to_values[ctid]) 
+	    if ctid in ctid_to_conditions:
+		conditions = ctid_to_conditions[ctid]
+		values.append(" | ".join(conditions))
+	    f.write("%s\n" % "\t".join(values))
+    f.close()
+    return
 
 
 def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
@@ -28,7 +65,7 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
     # Get CT info
     drug_to_ctids = get_interventions(base_dir)
     ctid_to_conditions = get_ctid_to_conditions(base_dir)
-    ctid_to_phase = get_ctid_to_phase(base_dir) 
+    ctid_to_values = get_ctid_to_details(base_dir) 
     # Get CT - MeSH disease mapping
     intervention_to_mesh_name = {}
     interventions = reduce(lambda x,y: x|y, ctid_to_conditions.values())
@@ -74,7 +111,7 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
 	    continue
 	phenotype_to_count = {} 
 	for ctid in ctids:
-	    phase, status = ctid_to_phase[ctid]
+	    phase, status, fda_regulated, why_stopped, results_date = ctid_to_values[ctid]
 	    val = 0.5
 	    if phase not in phase_to_value:
 		print "Unknown phase:", phase
@@ -125,16 +162,15 @@ def get_ctid_to_conditions(base_dir):
     return ctid_to_conditions
 
 
-def get_ctid_to_phase(base_dir):
-    study_file = base_dir + "clinical_study.txt"
-    # Get phase information
-    ctid_to_phase = {}
+def get_ctid_to_details(base_dir):
+    study_file = base_dir + "clinical_study.txt" # _noclob
+    # Get phase etc information
     f = open(study_file)
     line = f.readline()
     words = line.strip().split("|")
     header_to_idx = dict((word.lower(), i) for i, word in enumerate(words))
-    ctid_to_phase = {}
     text = None
+    ctid_to_values = {}
     while line:
 	line = f.readline()
 	if line.startswith("NCT"):
@@ -144,11 +180,14 @@ def get_ctid_to_phase(base_dir):
 		try:
 		    phase = words[header_to_idx["phase"]]
 		    status = words[header_to_idx["overall_status"]]
+		    fda_regulated = words[header_to_idx["is_fda_regulated"]]
+		    why_stopped = words[header_to_idx["why_stopped"]]
+		    results_date = words[header_to_idx["firstreceived_results_date"]]
 		except:
 		    print words
 		    return
 		if phase.strip() != "":
-		    ctid_to_phase[ctid] = (phase, status)
+		    ctid_to_values[ctid] = [phase, status, fda_regulated, why_stopped, results_date]
 	    text = line
 	else:
 	    text += line
@@ -158,33 +197,33 @@ def get_ctid_to_phase(base_dir):
     phase = words[header_to_idx["phase"]]
     status = words[header_to_idx["overall_status"]]
     if phase.strip() != "":
-	ctid_to_phase[ctid] = (phase, status)
-    return ctid_to_phase
+	ctid_to_values[ctid] = [phase, status, fda_regulated, why_stopped, results_date]
+    return ctid_to_values
 
 
-def get_interventions(base_dir): 
+def get_interventions(base_dir, include_other_names=True): 
     #ctid_to_drugs = {}
     drug_to_ctids = {}
     intervention_file = base_dir + "interventions.txt"
     f = open(intervention_file)
     f.readline()
-    prev_row = 0
+    #prev_row = 0
     ignored_intervention_types = set()
     for line in f:
 	words = line.strip().split("|")
 	try:
 	    row = int(words[0])
-	    if row != prev_row + 1:
-		continue
+	    #if row != prev_row + 1:
+	    #	continue
 	except:
 	    continue
-	prev_row += 1
-	try:
-	    ctid = words[1]
-	except:
-	    print words
+	#prev_row += 1
+	if len(words) < 5:
+	    #print words
+	    continue
+	ctid = words[1]
 	intervention = words[2]
-	drug = words[3].lower()
+	drug = words[3] 
 	drug = drug.decode("ascii", errors="ignore").encode("ascii")
 	drug = drug.strip("\"'")
 	if intervention != "Drug" and intervention != "Biological" :
@@ -195,34 +234,34 @@ def get_interventions(base_dir):
 	#conditions = drug_to_interventions.setdefault(drug, set())
 	#conditions |= ctid_to_conditions[ctid]
     f.close()
-    #print "Ignored intervention types:", ignored_intervention_types
-    intervention_file = base_dir + "intervention_browse.txt"
-    f = open(intervention_file)
-    f.readline()
-    for line in f:
-	words = line.strip().split("|")
-	row = int(words[0])
-	ctid = words[1]
-	drug = words[2].lower()
-	drug = drug.decode("ascii", errors="ignore").encode("ascii")
-	drug = drug.strip("\"'")
-	drug_to_ctids.setdefault(drug, set()).add(ctid)
-	#ctid_to_drugs.setdefault(ctid, set()).add(drug)
-    f.close()
-    intervention_file = base_dir + "intervention_other_names.txt"
-    f = open(intervention_file)
-    f.readline()
-    for line in f:
-	words = line.strip().split("|")
-	row = int(words[0])
-	ctid = words[1]
-	drug = words[3].lower()
-	drug = drug.decode("ascii", errors="ignore").encode("ascii")
-	drug = drug.strip("\"'")
-	drug_to_ctids.setdefault(drug, set()).add(ctid)
-	#ctid_to_drugs.setdefault(ctid, set()).add(drug)
-    f.close()
-    #print set(ctid_to_phase.values())
+    print "Ignored intervention types:", ignored_intervention_types
+    if include_other_names:
+	intervention_file = base_dir + "intervention_browse.txt"
+	f = open(intervention_file)
+	f.readline()
+	for line in f:
+	    words = line.strip().split("|")
+	    row = int(words[0])
+	    ctid = words[1]
+	    drug = words[2] #.lower()
+	    drug = drug.decode("ascii", errors="ignore").encode("ascii")
+	    drug = drug.strip("\"'")
+	    drug_to_ctids.setdefault(drug, set()).add(ctid)
+	    #ctid_to_drugs.setdefault(ctid, set()).add(drug)
+	f.close()
+	intervention_file = base_dir + "intervention_other_names.txt"
+	f = open(intervention_file)
+	f.readline()
+	for line in f:
+	    words = line.strip().split("|")
+	    row = int(words[0])
+	    ctid = words[1]
+	    drug = words[3] #.lower()
+	    drug = drug.decode("ascii", errors="ignore").encode("ascii")
+	    drug = drug.strip("\"'")
+	    drug_to_ctids.setdefault(drug, set()).add(ctid)
+	    #ctid_to_drugs.setdefault(ctid, set()).add(drug)
+	f.close()
     return drug_to_ctids #ctid_to_drugs 
 
 
@@ -243,7 +282,7 @@ def get_drug_to_interventions(drug_to_ctids):
 		continue
 	values = set()
 	for ctid in ctids:
-	    #if ctid_to_phase[ctid][0] != "Phase 3":  
+	    #if ctid_to_values[ctid][0] != "Phase 3":  
 	    #	continue
 	    values |= ctid_to_conditions[ctid]
 	if len(values) == 0:
@@ -263,7 +302,7 @@ def get_drug_to_interventions(drug_to_ctids):
     #for disease, interventions in disease_to_interventions.iteritems():
     #	print disease, interventions
     #print len(drug_to_interventions), drug_to_interventions.items()[:5]
-    #print drug_to_ctids["voriconazole"], print ctid_to_conditions["NCT00005912"], print ctid_to_phase["NCT00005912"]
+    #print drug_to_ctids["voriconazole"], print ctid_to_conditions["NCT00005912"], print ctid_to_values["NCT00005912"]
     #print drug_to_interventions["DB00582"]
     return drug_to_interventions
 
@@ -284,4 +323,7 @@ def get_frequent_interventions(drug_to_interventions):
     #print values[:50]
     return values
 
+
+if __name__ == "__main__":
+    main()
 

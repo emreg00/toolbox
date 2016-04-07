@@ -5,7 +5,7 @@
 ##############################################################################
 
 from xml.etree.ElementTree import iterparse
-import re, math
+import os, cPickle
 
 def main():
     base_dir = "../data/drugbank/"
@@ -239,7 +239,7 @@ class DrugBankXMLParser(object):
 	return drug_to_uniprots
 
 
-    def get_synonyms(self, selected_drugs=None):
+    def get_synonyms(self, selected_drugs=None, only_synonyms=False):
 	name_to_drug = {}
 	for drug, name in self.drug_to_name.iteritems():
 	    if selected_drugs is not None and drug not in selected_drugs:
@@ -251,11 +251,18 @@ class DrugBankXMLParser(object):
 		if selected_drugs is not None and drug not in selected_drugs:
 		    continue
 		synonym_to_drug[synonym.lower()] = drug
+	if only_synonyms:
+	    return name_to_drug, synonym_to_drug
 	for drug, brands in self.drug_to_brands.iteritems():
 	    for brand in brands:
 		if selected_drugs is not None and drug not in selected_drugs:
 		    continue
 		synonym_to_drug[brand.lower()] = drug
+	for drug, products in self.drug_to_products.iteritems():
+	    for product in products:
+		if selected_drugs is not None and drug not in selected_drugs:
+		    continue
+		synonym_to_drug[product.lower()] = drug
 	return name_to_drug, synonym_to_drug
 
 
@@ -274,6 +281,35 @@ class DrugBankXMLParser(object):
 	    selected_drugs.add(drugbank_id)
 	return selected_drugs
 
+
+def output_data(file_name, out_file):
+    dump_file = file_name + ".pcl"
+    if os.path.exists(dump_file):
+	parser = cPickle.load(open(dump_file))
+    else:
+	parser = DrugBankXMLParser(file_name)
+	parser.parse()
+	cPickle.dump(parser, open(dump_file, 'w'))
+    #target_type_list = ["target", "enzyme", "carrier", "transporter"]
+    #for target_type in target_type_list:
+    target_type_list = ["target"]
+    drug_to_uniprots = parser.get_targets(target_types = set(target_type_list), only_paction=False)
+    f = open(out_file, 'w')
+    f.write("Drugbank id\tName\tGroup\tTargets\n") 
+    #f.write("Drugbank id\tName\tGroup\tTarget uniprots\tEnzyme uniprots\tTransporter uniprots\tCarrier uniprots\tDescription\tIndication\tPubChem\tSMILES\tInchi\tAlternative names\t\n")
+    #drug_to_description drug_to_indication drug_to_synonyms drug_to_products drug_to_brands 
+    for drug, uniprots in drug_to_uniprots.iteritems():
+	name = parser.drug_to_name[drug]
+	groups = parser.drug_to_groups[drug]
+	values = [ drug, name.encode("ascii", "replace") ]
+	values.append(" | ".join(groups))
+	values.append(" | ".join(uniprots))
+	try:
+	    f.write("%s\n" % "\t".join(values))
+	except: 
+	    print values
+    f.close()
+    return
 
 
 if __name__ == "__main__":

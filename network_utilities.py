@@ -1284,9 +1284,9 @@ def get_nodes_and_edges_from_sif_file(file_name, store_edge_type = False, delim=
     f=open(file_name)
     for line in f:
 	if delim is None:
-	    words = line[:-1].split()
+	    words = line.rstrip("\n").split()
 	else:
-	    words = line[:-1].split(delim)
+	    words = line.rstrip("\n").split(delim)
         id1 = words[0]
         setNode.add(id1)
         if len(words) == 2:

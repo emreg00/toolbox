@@ -1,6 +1,6 @@
 import urllib2, os, cPickle, json, re, time
 import configuration, text_utilities, stat_utilities 
-import sys
+import sys, ssl
 
 CONFIG = configuration.Configuration() 
 
@@ -348,17 +348,20 @@ def get_counts(command, parameter, parameter2=None, parameter_effect=None):
     elif command == "drug-disease-effect2": # returns all reactions and their counts
 	assert parameter2 is not None
         txt = '%s:"%s"+AND+%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT)
+    elif command == "drug-effect-all2": # number of safety reports for that drug 
+	txt = '%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_EFFECT)
     else:
         raise ValueError("Unknown command: " + command)
     if API_USER_KEY is None:
         url = 'https://api.fda.gov/drug/event.json?search=%s&limit=%d' % (txt, 10*LIMIT)
     else:
         url = 'https://api.fda.gov/drug/event.json?api_key=%s&search=%s&limit=%d' % (API_USER_KEY, txt, 10*LIMIT)
-    #print url
+    #print url 
     n = None
     req = urllib2.Request(url)
+    gcontext = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     try:
-	response = urllib2.urlopen(req)
+	response = urllib2.urlopen(req, context=gcontext)
     except urllib2.HTTPError:
 	if parameter_effect is not None:
 	    n = 0

@@ -169,6 +169,10 @@ def fisher_exact(tp, fp, fn, tn, alternative="two-sided"):
     return oddsratio, pvalue
 
 
+def rank(a):
+    return stats.rankdata(a)
+
+
 if __name__ == "__main__":
     main()
 
