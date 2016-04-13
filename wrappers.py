@@ -119,3 +119,54 @@ def overlap_significance(geneids1, geneids2, nodes):
     return n, n1, n2, pval
 
 
+##### Proximity related #####
+def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456):
+    #distance = "closest"
+    #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
+    #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
+    nodes_network = set(network.nodes())
+    if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
+	return None # At least one of the node group not in network
+    d = calculate_closest_distance(network, nodes_from, nodes_to)
+    if nodes_from_random is None:
+	nodes_from_random = get_random_nodes(nodes_from, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    if nodes_to_random is None:
+	nodes_to_random = get_random_nodes(nodes_to, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    random_values_list = zip(nodes_from_random, nodes_to_random)
+    values = numpy.empty(n_random)
+    for i, values_random in enumerate(random_values_list):
+	nodes_from, nodes_to = values_random
+	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
+	values[i] = calculate_closest_distance(network, nodes_from, nodes_to)
+    #pval = float(sum(values <= d)) / len(values)
+    m, s = numpy.mean(values), numpy.std(values)
+    if s == 0:
+	z = 0.0
+    else:
+	z = (d - m) / s
+    return d, z, (m, s) #(z, pval)
+
+
+def calculate_closest_distance(network, nodes_from, nodes_to):
+    values_outer = []
+    for node_from in nodes_from:
+	values = []
+	for node_to in nodes_to:
+	    val = network_utilities.get_shortest_path_length_between(network, node_from, node_to)
+	    values.append(val)
+	d = min(values)
+	#print d,
+	values_outer.append(d)
+    d = numpy.mean(values_outer)
+    #print d
+    return d
+
+
+def get_random_nodes(nodes, network, bins=None, n_random=1000, min_bin_size=100, degree_aware=True, seed=None):
+    if bins is None:
+	# Get degree bins of the network
+	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    nodes_random = network_utilities.pick_random_nodes_matching_selected(network, bins, nodes, n_random, degree_aware, seed=seed) 
+    return nodes_random
+
+

@@ -21,25 +21,46 @@ and [network_utilities.py](network_utilities.py) contains methods related to net
 To replicate the analysis in the paper please refer to [proximity](http://github.com/emreg00/proximity) repository.
 
 ### Proximity calculation
-For calculating proximity, the inputs are: node_set_1, node_set_2 and network. 
+
+See calculate_proximity method in [wrappers.py](wrappers.py) and networkx based helper functions in [network_utilities.py](network_utilities.py) 
+for calculating proximity.
+
+`calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456)`
+
+For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy network (given below):
+
+```python
+>>> file_name = "toy.sif"
+>>> network = network_utilities.create_network_from_sif_file(file_name)
+>>> nodes_from = ["A", "C"]
+>>> nodes_to = ["B", "D", "E"]
+>>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2)
+>>> print (d, z, (mean, sd))
+(1.0, 0.97823676194805476, (0.75549999999999995, 0.24993949267772786))
+```
+
+Toy network (toy.sif):
+A 1 B
+A 1 C
+A 1 D
+A 1 E
+A 1 F
+A 1 G
+A 1 H
+B 1 C
+B 1 D
+B 1 I
+B 1 J
+C 1 K
+D 1 E
+D 1 I
+E 1 F
+
+The inputs are the two groups of nodes and the network. 
 The nodes in the network are binned such that the nodes in the same bin have similar degrees. 
-Next, random nodes matching the number and the degree of the nodes in the node sets are chosen.
+For real networks, use a larger min_bin_size (e.g., 100). 
+The random nodes matching the number and the degree of the nodes in the node sets are chosen
+using these bins.
 The average distance from the nodes in one set to the other is then calculated and compared to the 
 random expectation (the distances observed in random groups).
-Below are the relevant methods in [network_utilities.py](network_utilities.py) for calculating the proximity.
-
-- Creating node bins by degree:
-
-    bins = get_degree_binning(network, min_bin_size)
-  
-- Selecting nodes randomly matching the degrees of the nodes in the given set:
-
-    nodes_random = pick_random_nodes_matching_selected(network, bins, nodes, n_random, degree_aware)
-
-- Calculating average distance from the nodes in nodes_from to the closest node in the nodes_to (lengths is the dictionary containing all pairwise shortest path distances, distance="closest", parameters={}):
-
-    d = get_separation(network, lengths, nodes_from, nodes_to, distance, parameters)
-
-
-
 
