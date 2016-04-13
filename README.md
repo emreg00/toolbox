@@ -22,7 +22,7 @@ To replicate the analysis in the paper please refer to [proximity](http://github
 
 ### Proximity calculation
 
-See calculate_proximity method in [wrappers.py](wrappers.py) and networkx based helper functions in [network_utilities.py](network_utilities.py) 
+See `calculate_proximity` method in [wrappers.py](wrappers.py) and networkx based helper functions in [network_utilities.py](network_utilities.py) 
 for calculating proximity.
 
 `calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456)`
@@ -30,6 +30,7 @@ for calculating proximity.
 For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy network (given below):
 
 ```python
+>>> from toolbox import network_utilities, wrappers
 >>> file_name = "toy.sif"
 >>> network = network_utilities.create_network_from_sif_file(file_name)
 >>> nodes_from = ["A", "C"]
@@ -37,9 +38,11 @@ For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy netwo
 >>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2)
 >>> print (d, z, (mean, sd))
 (1.0, 0.97823676194805476, (0.75549999999999995, 0.24993949267772786))
+>>>
 ```
 
 Toy network (toy.sif):
+```
 A 1 B
 A 1 C
 A 1 D
@@ -55,10 +58,11 @@ C 1 K
 D 1 E
 D 1 I
 E 1 F
+```
 
 The inputs are the two groups of nodes and the network. 
 The nodes in the network are binned such that the nodes in the same bin have similar degrees. 
-For real networks, use a larger min_bin_size (e.g., 100). 
+For real networks, use a larger `min_bin_size` (e.g., 100). 
 The random nodes matching the number and the degree of the nodes in the node sets are chosen
 using these bins.
 The average distance from the nodes in one set to the other is then calculated and compared to the 
