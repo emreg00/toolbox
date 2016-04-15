@@ -170,3 +170,8 @@ def get_random_nodes(nodes, network, bins=None, n_random=1000, min_bin_size=100,
     return nodes_random
 
 
+### Functional enrichment related ###
+
+def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", out_file_name):
+    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, open(out_file_name, 'w').write, tex_format = False) 
+
