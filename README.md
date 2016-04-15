@@ -3,6 +3,15 @@
 Toolbox is a repository encapsulating various scripts used in my research on the analysis of disease and drug related biological data sets. 
 It contains generic utilities for data processing (e.g., parsing, network-based analysis, proximity, etc, ...).
 
+Contents 
+
+* [Background](#background)
+* [Parsers](#parsers)
+* [Wrappers](#wrappers)
+* [Proximity](#proximity)
+* [Citation](#citation)
+
+
 ## Background
 
 The code here has been developed during the analysis of data in various projects such as
@@ -16,6 +25,9 @@ The package mainly consists of two types of files:
 
 For instance, [parse_drugbank.py](parse_drugbank.py) contains methods to parse DrugBank data base (v.3) XML dump 
 and [network_utilities.py](network_utilities.py) contains methods related to network generation and analysis. 
+
+
+## Parsers
 
 Parsers available for the following resources:
 
@@ -52,7 +64,7 @@ Parsers available for the following resources:
 The parsers are provided "as is" and might not work due to updates on the data format of these resources. Please contact me for suggestions, bug reports and enquiries.
 
 
-## Wrappers.py: Easy access to various methods
+## Wrappers
 
 [wrappers.py](wrappers.py) provides an easy to use interface to various methods I commonly use. It is continuously under development. Currently it contains methods to 
 - Map UniProt, ENTREZ ids and gene symbols
@@ -112,6 +124,7 @@ The random nodes matching the number and the degree of the nodes in the node set
 using these bins.
 The average distance from the nodes in one set to the other is then calculated and compared to the 
 random expectation (the distances observed in random groups).
+
 
 ## Citation
 
