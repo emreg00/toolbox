@@ -22,8 +22,7 @@ To replicate the analysis in the paper please refer to [proximity](http://github
 
 ### Proximity calculation
 
-See `calculate_proximity` method in [wrappers.py](wrappers.py) and networkx based helper functions in [network_utilities.py](network_utilities.py) 
-for calculating proximity.
+See `calculate_proximity` method in [wrappers.py](wrappers.py)  for calculating proximity:
 
 `calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456)`
 
@@ -32,7 +31,7 @@ For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy netwo
 ```python
 >>> from toolbox import network_utilities, wrappers
 >>> file_name = "toy.sif"
->>> network = network_utilities.create_network_from_sif_file(file_name)
+>>> network = wrappers.get_network(file_name, only_lcc = True)
 >>> nodes_from = ["A", "C"]
 >>> nodes_to = ["B", "D", "E"]
 >>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2)
