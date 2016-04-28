@@ -172,6 +172,11 @@ def get_random_nodes(nodes, network, bins=None, n_random=1000, min_bin_size=100,
 
 ### Functional enrichment related ###
 
-def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", out_file_name):
-    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, open(out_file_name, 'w').write, tex_format = False) 
+def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", out_file_name = None):
+    if out_file_name is not None:
+	f_output = open(out_file_name, 'w').write
+    else:
+	from stdout import sys
+	f_output = stdout.write
+    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False) 
 
