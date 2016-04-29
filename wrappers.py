@@ -170,6 +170,45 @@ def get_random_nodes(nodes, network, bins=None, n_random=1000, min_bin_size=100,
     return nodes_random
 
 
+### GUILD related ###
+
+def create_node_file(node_to_score, nodes, node_file, background_score = 0.01):
+    """
+    Simplified method for creating guild node score files
+    """
+    f = open(node_file, 'w')
+    for node in nodes:
+	if node in node_to_score:
+	    score = node_to_score[node]
+	else:
+	    score = background_score
+	f.write("%s %f\n" % (node, score))
+    f.close()
+    return
+
+
+def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir, executable_path = None, background_score = 0.01, qname=None): 
+    # Create node file
+    node_file = "%s%s.node" % (output_dir, phenotype)
+    create_node_file(node_to_score, network_nodes, node_file, background_score)
+    output_file = "%s%s.ns" % (output_dir, phenotype)
+    n_repetition = 3 
+    n_iteration = 2 
+    # Get and run the GUILD command
+    #print strftime("%H:%M:%S - %d %b %Y") #, score_command
+    score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    if qname is None:
+	if executable_path is None:
+	    executable_path = "guild" # assuming accessible guild executable
+	score_command = executable_path + score_command
+	os.system(score_command)
+    else:
+	#os.system("qsub -cwd -o out -e err -q %s -N %s -b y %s" % (qname, scoring_type, score_command))
+	#print "qsub -cwd -o out -e err -q %s -N guild_%s -b y %s" % (qname, drug, score_command)
+	print "%s" % (score_command.replace('"', ''))
+    return
+
+
 ### Functional enrichment related ###
 
 def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", out_file_name = None):

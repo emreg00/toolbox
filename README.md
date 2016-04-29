@@ -73,6 +73,25 @@ The parsers are provided "as is" and might not work due to updates on the data f
 - Calculating functional enrichment using [FuncAssociate](http://llama.mshri.on.ca/funcassociate/) API
 
 
+## GUILD
+
+See below for python interface to run GUILD (assumes it is properly compiled and accessible at executable_path) using A and C as seeds and a toy network:
+
+```python
+>>> from toolbox import wrappers
+>>> file_name = "toy.sif"
+>>> network = wrappers.get_network(file_name, only_lcc = True)
+>>> nodes = set(network.nodes())
+>>> seeds = ["A", "C"]
+>>> node_to_score = dict((node, 1) for node in seeds)
+>>> name = "sample_run"
+>>> output_dir = "./"
+>>> wrappers.run_guild(name, node_to_score, nodes, file_name, output_dir, executable_path)
+```
+
+After this command input node score file "sample_run.node" and output node score file "sample_run.ns" will be created in the current directory.
+
+
 ## Proximity
 
 ### Proximity analysis

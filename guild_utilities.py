@@ -32,6 +32,7 @@ def main():
     guild_utilities.run_scoring(scoring_folder, executable_path, scoring_type="netscore", parameters={"n_iteration":2, "n_repetition":3}, qname=None, calculate_pvalue=True, xval=3)
     return
 
+
 def prepare_scoring(network_file, seed_file, scoring_folder="./", non_seed_score=0.01, seed_score=1.0, edge_score=1.0, n_sample=100, delim=" ", name=None):
     """
 	Creates input files required by GUILD executable.
