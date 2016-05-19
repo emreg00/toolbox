@@ -1,4 +1,3 @@
-import TsvReader
 import os, cPickle, gzip
 
 def main():

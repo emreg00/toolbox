@@ -9,14 +9,14 @@ def main():
     return 
 
 
-def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id):
+def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id, cutoff=1):
     disease_to_drugs = {}
     mesh_id_to_phenotype = {}
     for phenotype, mesh_id in phenotype_to_mesh_id.items():
         mesh_id_to_phenotype[mesh_id] = phenotype
     for drugbank_id, diseases in drug_to_diseases.iteritems():
         for phenotype, dui, val in diseases:
-            if val > 0.5:
+            if val >= cutoff:
                 if dui in mesh_id_to_phenotype: # In the disease data set
                     disease = mesh_id_to_phenotype[dui].lower()
                     disease_to_drugs.setdefault(disease, set()).add(drugbank_id)
@@ -48,7 +48,7 @@ def get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_
     return drug_to_diseases
 
 
-def get_medi_mapping(mapping_file):
+def get_medi_mapping(mapping_file, textual_indication=False):
     """ 
     RXCUI_IN,DRUG_DESC,UMLS_CUI,ICD9,INDICATION_DESCRIPTION,MENTIONEDBYRESOURCES,HIGHPRECISIONSUBSET,POSSIBLE_LABEL_USE
     44,Mesna,C0018965,599.7,Hematuria,1,0,0
@@ -60,6 +60,8 @@ def get_medi_mapping(mapping_file):
         words = line.strip().split(",")
         name = words[1]
         cui = words[2]
+	if textual_indication:
+	    cui = words[3]
         in_hps = words[6]
         confidence = 0.5
         if in_hps == "1":

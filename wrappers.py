@@ -28,6 +28,12 @@ def get_network(network_file, only_lcc):
 	components = network_utilities.get_connected_components(network, False)
 	network = network_utilities.get_subgraph(network, components[0])
 	#print len(network.nodes()), len(network.edges())
+	network_lcc_file = network_file + ".lcc"
+	if not os.path.exists(network_lcc_file ):
+	    f = open(network_lcc_file, 'w')
+	    for u,v in network.edges():
+		f.write("%s 1 %s\n" % (u, v))
+	    f.close()
     return network
 
 
