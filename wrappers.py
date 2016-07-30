@@ -3,7 +3,7 @@
 # drug and network analysis
 # e.g. 10/2015
 #######################################################################
-import network_utilities, parse_msigdb, stat_utilities, dict_utilities
+import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReader
 import parse_uniprot, parse_ncbi
 import csv, numpy, os, cPickle
 
@@ -39,7 +39,7 @@ def get_network(network_file, only_lcc):
 
 ##### Gene expression related #####
 
-def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file=None):
+def get_expression_info(gexp_file, process=None, delim=',', quote='"', R_header=False, dump_file=None):
     """
     To get gene expression info
     process: a set(["log2", "z", "abs"]) or None
@@ -52,7 +52,8 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file
     reader = csv.reader(f, delimiter=delim, quotechar=quote)
     header = reader.next()
     #print len(header), header
-    header = header[1:]
+    if R_header == False:
+	header = header[1:]
     cell_line_to_idx = dict([ (cell_line, i) for i, cell_line in enumerate(header) ])
     gene_to_idx = {}
     values_arr = []
@@ -80,7 +81,84 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', dump_file
     return gexp, gene_to_idx, cell_line_to_idx
 
 
-##### Pathway related #####
+def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_type = "GeneID"):
+    """
+    For parsing DE file generated using R PEPPER package
+    """
+    fields_to_include = [id_type, "P.Value", "logFC", "adj.P.Val"]
+    parser = TsvReader.TsvReader(file_name, delim="\t", inner_delim=None)
+    header_to_idx, id_to_values = parser.read(fields_to_include, keys_to_include=None, merge_inner_values=False)
+    if "" in id_to_values:
+	del id_to_values[""]
+    #print len(id_to_values)
+    #gene = "10458"
+    #if gene in id_to_values:
+    #    print id_to_values[gene] 
+    genes = set()
+    genes_all = set()
+    values_gene = []
+    for gene, values in id_to_values.iteritems():
+	include = False
+	for val in values:
+	    pval = val[header_to_idx["adj.p.val"]] # "p.value"]]
+	    if pval == "NA":
+		continue
+	    fc = float(val[header_to_idx["logfc"]])
+	    if float(pval) <= cutoff_adj:
+		if abs(fc) >= cutoff_fc: # fc >= cutoff_fc: 
+		    include = True
+		if n_top is not None:
+		    values_gene.append((abs(fc), gene))
+	for word in gene.split("///"):
+	    word = word.strip()
+	    if word == "---":
+		continue
+	    if include:
+		genes.add(word)
+	    else:
+		genes_all.add(word)
+    if n_top is not None:
+	values_gene.sort()
+	genes = set([ word.strip() for fc, gene in values_gene[-n_top:] for word in gene.split("///") ])
+    return genes, genes_all
+
+
+def get_z_genes(file_name, cutoff_z = 2):
+    """
+    For parsing DE-Z file generated using R PEPPER package
+    """
+    gexp, gene_to_idx, cell_line_to_idx = get_expression_info(file_name, process=None, delim='\t', R_header=True) #, quote='"', dump_file=None)
+    genes = gene_to_idx.items()
+    genes.sort(key=lambda x: x[1])
+    genes = numpy.array(zip(*genes)[0])
+    sample_to_genes = {}
+    for cell_line, idx in cell_line_to_idx.iteritems():
+	indices = numpy.abs(gexp[:,idx]) > cutoff_z 
+	sample_to_genes[cell_line] = genes[indices]
+	#if cell_line in ["GSM734834", "GSM734833"]: 
+	#    print cell_line, len(genes[indices]), genes[indices] 
+    return sample_to_genes
+
+
+def get_sample_mapping(file_name, labels_case, labels_control=None):
+    f = open(file_name)
+    labels_case = set(labels_case)
+    if labels_control is not None:
+	labels_control = set(labels_control)
+    samples_case = []
+    samples_control = []
+    for line in f:
+	sample, label = line.strip("\n").split("\t")
+	label = label.strip()
+	if label in labels_case:
+	    samples_case.append(sample)
+	else:
+	    if labels_control is None or label in labels_control:
+		samples_control.append(sample)
+    return samples_case, samples_control
+
+
+##### Disease, pathway, comorbidity, symptom info related #####
 
 def get_pathway_info(pathway_file, prefix=None, nodes=None):
     """
@@ -113,6 +191,44 @@ def get_diseasome_genes(diseasome_file, nodes=None):
 	disease_to_genes[disease] = genes
 	disease_to_category[disease] = category
     return disease_to_genes, disease_to_category
+
+
+def get_comorbidity_info(correlation_type="phi", only_significant=False):
+    """
+    Parse HuDiNe data
+    correlation_type: phi (pearson correlation) | RR (favors rare disease pairs)
+    """
+    comorbidity_file = CONFIG.get("comorbidity_file")
+    f = open(comorbidity_file)
+    header_to_idx = dict((word, i) for i, word in enumerate(f.readline().strip().split("\t")))
+    disease_to_disease_comorbidity = {}
+    for line in f:
+	words = line.strip().split("\t")
+	disease1, disease2 = words[:2]
+	significance = words[header_to_idx["sign_"+correlation_type]]
+	if only_significant and significance == "0":
+	    continue
+	val = float(words[header_to_idx[correlation_type]])
+	disease_to_disease_comorbidity.setdefault(disease1, {})[disease2] = (val, significance)
+	disease_to_disease_comorbidity.setdefault(disease2, {})[disease1] = (val, significance)
+    f.close()
+    return disease_to_disease_comorbidity
+
+
+def get_symptom_info():
+    disease_to_symptoms = {}
+    symptom_to_diseases = {}
+    f = open(CONFIG.get("symptom_file"))
+    for line in f:
+	words = line.strip("\n").split("\t")
+	symptom, disease, n, score = words
+	symptom = symptom.lower()
+	disease = disease.lower()
+	#if float(score) < 3:
+	#    continue
+	disease_to_symptoms.setdefault(disease, set()).add(symptom)
+	symptom_to_diseases.setdefault(symptom, set()).add(disease)
+    return disease_to_symptoms, symptom_to_diseases
 
 
 ##### Statistics related #####
@@ -224,4 +340,6 @@ def check_functional_enrichment(id_list, background_id_list = None, id_type = "g
 	from stdout import sys
 	f_output = stdout.write
     return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False) 
+
+
 

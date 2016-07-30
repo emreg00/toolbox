@@ -1,8 +1,8 @@
 try:
     #from external.funcassociate import client
     #from funcassociate import client
-    from func_associate import func_associate as client
-    #import func_associate as client
+    #from toolbox import func_associate as client
+    import func_associate as client
 except:
     client = None
     print "Import error: Funcassociate. Make sure that funcassociate is in toolbox!"

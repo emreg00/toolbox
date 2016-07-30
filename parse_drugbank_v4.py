@@ -36,6 +36,7 @@ class DrugBankXMLParser(object):
 	self.file_name = filename
 	self.drug_to_name = {}
 	self.drug_to_description = {}
+	self.drug_to_type = {}
 	self.drug_to_groups = {}
 	self.drug_to_indication = {}
 	self.drug_to_pharmacodynamics = {}
@@ -70,6 +71,7 @@ class DrugBankXMLParser(object):
 	event, root = context.next()
 	state_stack = [ root.tag ]
 	drug_id = None
+	drug_type = None
 	drug_id_partner = None
 	current_target = None
 	resource = None
@@ -79,7 +81,12 @@ class DrugBankXMLParser(object):
 	for (event, elem) in context:
 	    if event == "start":
 		state_stack.append(elem.tag)
-		if elem.tag == self.NS+"drugbank-id":
+		if len(state_stack) <= 2 and elem.tag == self.NS+"drug":
+		    if "type" in elem.attrib:
+			drug_type = elem.attrib["type"]
+		    else:
+			drug_type = None
+		elif elem.tag == self.NS+"drugbank-id": 
 		    if "primary" in elem.attrib and state_stack[-3] == self.NS+"drugbank" and state_stack[-2] == self.NS+"drug":
 			drug_id = None
 		    elif len(state_stack) > 3 and state_stack[-3] == self.NS+"drug-interactions" and state_stack[-2] == self.NS+"drug-interaction":
@@ -92,17 +99,24 @@ class DrugBankXMLParser(object):
 		    if state_stack[-2] in target_types_plural: 
 			current_target = None 
 	    if event == "end":
+		if len(state_stack) <= 2 and elem.tag == self.NS+"drug":
+		    if "type" in elem.attrib:
+			drug_type = elem.attrib["type"]
+		    else: 
+			drug_type = None
 		if elem.tag == self.NS+"drugbank-id":
 		    if state_stack[-2] == self.NS+"drug":
 			if "primary" in elem.attrib:
 			    drug_id = elem.text
-			    #print drug_id
+			    if drug_type is not None: 
+			        self.drug_to_type[drug_id] = drug_type
+			    #print drug_id, drug_type
 		    elif len(state_stack) > 3 and state_stack[-3] == self.NS+"drug-interactions" and state_stack[-2] == self.NS+"drug-interaction":
 			d = self.drug_to_interactions.setdefault(drug_id, {})
 			drug_id_partner = elem.text
 			d[drug_id_partner] = ""
 		elif elem.tag == self.NS+"name":
-		    if state_stack[-2] == self.NS+"drug":
+		    if len(state_stack) <= 3 and state_stack[-2] == self.NS+"drug": 
 			self.drug_to_name[drug_id] = elem.text.strip()
 		    elif state_stack[-2] == self.NS+"product" and state_stack[-3] == self.NS+"products":
 			product = elem.text

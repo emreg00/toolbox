@@ -63,9 +63,7 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
 	    for name_mod in [ name, name.replace(",", ""), name.replace("-", " "), name.replace(",", "").replace("-", " ") ]:
 		mesh_name_to_id[name_mod] = mesh_id
     # Get CT info
-    drug_to_ctids = get_interventions(base_dir)
-    ctid_to_conditions = get_ctid_to_conditions(base_dir)
-    ctid_to_values = get_ctid_to_details(base_dir) 
+    drug_to_ctids, ctid_to_conditions, ctid_to_values = get_ct_data(base_dir, include_other_names=True)
     # Get CT - MeSH disease mapping
     intervention_to_mesh_name = {}
     interventions = reduce(lambda x,y: x|y, ctid_to_conditions.values())
@@ -135,6 +133,20 @@ def get_drug_disease_mapping(base_dir, selected_drugs, name_to_drug, synonym_to_
     #print len(drug_to_diseases), drug_to_diseases.items()[:5]
     cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases
+
+
+def get_ct_data(base_dir, include_other_names=True, dump_file=None):
+    if dump_file is not None and os.path.exists(dump_file):
+	values = cPickle.load(open(dump_file))
+	#drug_to_ctids, ctid_to_conditions, ctid_to_values = values
+	return values
+    drug_to_ctids = get_interventions(base_dir, include_other_names)
+    ctid_to_conditions = get_ctid_to_conditions(base_dir)
+    ctid_to_values = get_ctid_to_details(base_dir) 
+    values = drug_to_ctids, ctid_to_conditions, ctid_to_values
+    if dump_file is not None:
+	cPickle.dump(values, open(dump_file, 'w'))
+    return values
 
 
 def get_ctid_to_conditions(base_dir):

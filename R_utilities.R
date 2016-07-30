@@ -235,7 +235,7 @@ draw.degree.distribution.with.fit<-function(d, column="degree", out.file=NULL) {
 }
 
 
-### BELOW NOT VERIFIED
+### BELOW NOT ADOPTED / NOT TESTED
 ### Statistical methods
 get.Fishers.enrichment<-function(file.name) {
 
