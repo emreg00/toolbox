@@ -52,13 +52,19 @@ class FuncassociateClient(object):
         return self.request(payload)
 
 
-    def functionate(self, query, species="Homo sapiens", namespace="entrezgene", genespace=None, mode="unordered", reps=2000):
+    def functionate(self, query, species="Homo sapiens", namespace="entrezgene", genespace=None, mode="unordered", reps=2000, support=None, associations=None):
 	params_dict = { "query": query, 
 		       "species": species,
 		       "namespace": namespace,
 		       "mode": mode,
 		       "reps": reps
 			       }
+	if associations is not None:
+	    params_dict["support"] = support
+	if associations is not None:
+	    params_dict["associations"] = associations
+	    del params_dict["species"]
+	    del params_dict["namespace"]
 	if genespace is not None:
 	    params_dict["genespace"] = genespace
 	payload = {'id': 1,

@@ -22,11 +22,12 @@ def check_functional_enrichment_of_human_gene_symbols(file_name, out_file_name):
     check_functional_enrichment(a, None, "genesymbol", open(out_file_name, 'w').write, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format = False) 
     return
 
-def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False):
+def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False, support=None, associations=None):
     """
 	Check GO functional enrichment using funcassociate web service
 	gene_ids is a list of gene symbols (without whitespace) or gene ids
 	id_type
+	support types: ['EXP', 'IC', 'IDA', 'IEA', 'IEP', 'IGC', 'IGI', 'IMP', 'IPI', 'ISA', 'ISM', 'ISO', 'ISS', 'NAS', 'RCA', 'TAS']
     """
     if id_type == "geneid":
 	id_type = "entrezgene"
@@ -48,7 +49,9 @@ def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_metho
                              namespace = id_type,
                              genespace = gene_ids,
                              mode = mode,
-                             reps = reps)
+                             reps = reps,
+			     support = support,
+			     associations = associations)
 
     if output_method is None:
 	return response["over"]
