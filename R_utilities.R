@@ -35,8 +35,10 @@ convert.p.value<-function(pval, or=1) {
 
 convert.z.score<-function(z, one.sided=NULL) {
     if(is.null(one.sided)) {
+	#pval = pnorm(-abs(z), mean=mean(z), sd=sd(z))
 	pval = pnorm(-abs(z));
 	pval = 2 * pval
+	pval[pval > 1] = 1
     } else if(one.sided=="-") {
 	pval = pnorm(z);
     } else {

@@ -333,13 +333,18 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 
 ### Functional enrichment related ###
 
-def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", out_file_name = None):
+def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", evidences = None, out_file_name = None):
+    """
+    evidences = ['EXP', 'IDA', 'IEP', 'IGI', 'IMP', 'ISA', 'ISM', 'ISO', 'ISS']
+    evidences = None corresponds to ['EXP', 'IC', 'IDA', 'IEA', 'IEP', 'IGC', 'IGI', 'IMP', 'IPI', 'ISA', 'ISM', 'ISO', 'ISS', 'NAS', 'RCA', 'TAS']
+    for custom associations: association = [["GO:0006509", "351"], ["GO:0048167", "348", "5663", "5664", "23621"], ["GO:0097458", "1005", "1006", "1007"], ["GO:0048487", "1", "2", "351"], ["GO:0048488", map(str, range(1000,2000))]]
+    """
     if out_file_name is not None:
 	f_output = open(out_file_name, 'w').write
     else:
 	from stdout import sys
 	f_output = stdout.write
-    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False) 
+    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False, support = evidences, associations = None) 
 
 
 
