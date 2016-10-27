@@ -14,6 +14,11 @@ def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
     return uniprot_to_geneid
 
 
+def get_uniprot_to_symbol(uniprot_symbol_file, uniprot_ids):
+    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_symbol_file, uniprot_ids, only_min=False)
+    return uniprot_to_geneid
+
+
 def get_geneid_symbol_mapping(mapping_file):
     geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     return geneid_to_names, name_to_geneid
@@ -242,7 +247,7 @@ def overlap_significance(geneids1, geneids2, nodes):
 
 
 ##### Proximity related #####
-def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456):
+def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
     #distance = "closest"
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
@@ -250,12 +255,14 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
 	return None # At least one of the node group not in network
     d = calculate_closest_distance(network, nodes_from, nodes_to)
+    if bins is None and (nodes_from_random is None or nodes_to_random is None):
+	bins = network_utilities.get_degree_binning(network, min_bin_size) 
     if nodes_from_random is None:
-	nodes_from_random = get_random_nodes(nodes_from, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	nodes_from_random = get_random_nodes(nodes_from, network, bins, n_random = n_random, seed = seed)
     if nodes_to_random is None:
-	nodes_to_random = get_random_nodes(nodes_to, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	nodes_to_random = get_random_nodes(nodes_to, network, bins, n_random = n_random, seed = seed)
     random_values_list = zip(nodes_from_random, nodes_to_random)
-    values = numpy.empty(n_random)
+    values = numpy.empty(len(nodes_from_random)) #n_random
     for i, values_random in enumerate(random_values_list):
 	nodes_from, nodes_to = values_random
 	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
