@@ -165,18 +165,23 @@ def get_sample_mapping(file_name, labels_case, labels_control=None):
 
 ##### Disease, pathway, comorbidity, symptom info related #####
 
-def get_pathway_info(pathway_file, prefix=None, nodes=None):
+def get_pathway_info(pathway_file, prefix=None, nodes=None, max_pathway_size=None):
     """
     nodes to filter geneids that are not in the network
     prefix: kegg | reactome | biocarta
     """
     pathway_to_geneids, geneid_to_pathways = parse_msigdb.get_msigdb_info(pathway_file, prefix)
-    if nodes is not None:
+    if nodes is not None or max_pathway_size is not None:
 	pathway_to_geneids_mod = {}
 	for pathway, geneids in pathway_to_geneids.iteritems():
-	    geneids_mod = geneids & nodes
-	    if len(geneids_mod) > 0:
-		pathway_to_geneids_mod[pathway] = geneids_mod 
+	    if max_pathway_size is not None:
+		if len(geneids) > max_pathway_size:
+		    continue
+	    if nodes is not None:
+		geneids &= nodes
+		if len(geneids) == 0:
+		    continue
+	    pathway_to_geneids_mod[pathway] = geneids
 	pathway_to_geneids = pathway_to_geneids_mod
     return pathway_to_geneids
 

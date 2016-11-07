@@ -17,10 +17,11 @@ def main():
     return
 
 
-def convert_p_values_to_z_scores(p_values):
-    a = np.random.normal(size=1000000) #1000000 # 10000000
-    #z_score = st.norm.ppf(1 - p_values)
-    return map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), p_values)
+def convert_p_values_to_z_scores(p_values, size=1000000):
+    #a = np.random.normal(size) #1000000 # 10000000
+    #z_scores = map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), p_values)
+    z_scores = stats.norm.ppf(p_values)
+    return z_scores
 
 
 def convert_z_scores_to_p_values(z_scores, one_sided = None):
@@ -171,6 +172,60 @@ def fisher_exact(tp, fp, fn, tn, alternative="two-sided"):
 
 def rank(a):
     return stats.rankdata(a)
+
+
+def ksrepo_score(golds, candidates):
+    """
+    Given a ranked/prioritized candidates list (gene/pathway set), 
+    finds the ks running sum score based on the
+    ranks of the matches of candidates on golds
+    Python implementation of ks_simple on https://github.com/adam-sam-brown/ksRepo/blob/master/R/ksRepo.R
+    """
+    candidates = np.array(candidates)
+    idx = np.in1d(candidates, golds)
+    if np.sum(idx) == 0: # No match
+	return np.nan
+    ranks = np.arange(1.0, len(candidates)+1)
+    V = ranks[idx]
+    t = len(V)
+    j = np.arange(1.0, t+1)
+    n = len(golds)
+    #print V, n, len(candidates)
+    a = np.max(j/t - V/n)
+    b = np.max(V/n - (j-1)/t)
+    if a > b:
+	ks = a
+    else:
+	ks = -b
+    return ks
+
+
+def ks_score(golds, candidates):
+    """
+    Given a golds set (genes / pathways), 
+    calculates KS score as proposed by Mootha et al.
+    for the ranked/prioritized candidate list
+    """
+    golds = set(golds)
+    score = 0
+    max_score = None
+    n = len(candidates)
+    g = 1.0*len(golds)
+    val_in = np.sqrt((n-g)/g)
+    val_out = -np.sqrt(g/(n-g))
+    if n <= g:
+	raise ValueError("Candidate set is smaller than gold set")
+    for candidate in candidates:
+	if candidate in golds:
+	    score += val_in 
+	else:
+	    score += val_out 
+	if max_score is None:
+	    max_score = score
+	else:
+	    if score > max_score:
+		max_score = score
+    return max_score
 
 
 if __name__ == "__main__":
