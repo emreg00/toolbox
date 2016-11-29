@@ -77,6 +77,8 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', R_header=
 	    gexp = (gexp - gexp.mean(axis=1)[:, numpy.newaxis]) / gexp.std(axis=1, ddof=1)[:, numpy.newaxis]
 	if "abs" in process:
 	    gexp = numpy.abs(gexp)
+	#if "na.rm" in process:
+	#    idx = numpy.where(numpy.isnan(a)) # need to remove rows with NAs
 	#print gexp.shape, gexp_norm.shape
 	#print gexp[0,0], gexp_norm[0,0]
 	#return gene_to_values, cell_line_to_idx
@@ -321,26 +323,37 @@ def create_node_file(node_to_score, nodes, node_file, background_score = 0.01):
     return
 
 
-def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir, executable_path = None, background_score = 0.01, qname=None): 
+def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir, executable_path = None, background_score = 0.01, qname=None, method='s'): 
     # Create node file
     node_file = "%s%s.node" % (output_dir, phenotype)
     create_node_file(node_to_score, network_nodes, node_file, background_score)
-    output_file = "%s%s.ns" % (output_dir, phenotype)
-    n_repetition = 3 
-    n_iteration = 2 
+    output_file = "%s%s.n%s" % (output_dir, phenotype, method)
     # Get and run the GUILD command
     #print strftime("%H:%M:%S - %d %b %Y") #, score_command
-    score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    if method == 's': 
+	n_repetition = 3 
+	n_iteration = 2 
+	score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    elif method == 'r':
+	n_iteration = 50 
+	score_command = ' -s r -n "%s" -e "%s" -o "%s" -i %d' % (node_file, network_file, output_file, n_iteration)
+    elif method == 'p':
+	score_command = ' "%s" "%s" "%s" 1' % (node_file, network_file, output_file)
+    else:
+	raise NotImplementedError("method %s" % method) 
     if qname is None:
 	if executable_path is None:
-	    executable_path = "guild" # assuming accessible guild executable
+	    if method in ["s", "r"]:
+		executable_path = "guild" # assuming accessible guild executable
+	    else:
+		executable_path = "netprop.sh" # assuming accessible bash script calling R 
 	score_command = executable_path + score_command
 	os.system(score_command)
     else:
 	#os.system("qsub -cwd -o out -e err -q %s -N %s -b y %s" % (qname, scoring_type, score_command))
 	#print "qsub -cwd -o out -e err -q %s -N guild_%s -b y %s" % (qname, drug, score_command)
 	print "%s" % (score_command.replace('"', ''))
-    return
+    return score_command
 
 
 ### Functional enrichment related ###

@@ -99,6 +99,16 @@ def correlation(x, y, cor_type="pearson"):
     return coef, pval
 
 
+def jaccard(x, y):
+    return len(x & y) / len(x | y)
+
+
+def jaccard_signed(x_up, x_down, y_up, y_down, costs = [1, 1, 1, 1,]):
+    j = costs[0] * len(x_up & y_up) + costs[3] * len(x_down & y_down) 
+    j -= costs[1] * len(x_up & y_down) + costs[2] * len(x_down & y_up)
+    return j / 2.0
+
+
 def statistical_test(x, y, test_type="wilcoxon", alternative="two-sided"):
     # test stat, p-val
     if test_type == "t":
@@ -200,7 +210,7 @@ def ksrepo_score(golds, candidates):
     return ks
 
 
-def ks_score(golds, candidates):
+def ks_score(golds, candidates, N=None):
     """
     Given a golds set (genes / pathways), 
     calculates KS score as proposed by Mootha et al.
@@ -209,8 +219,11 @@ def ks_score(golds, candidates):
     golds = set(golds)
     score = 0
     max_score = None
-    n = len(candidates)
-    g = 1.0*len(golds)
+    if N is None:
+	n = len(candidates)
+    else:
+	n = N
+    g = float(len(golds))
     val_in = np.sqrt((n-g)/g)
     val_out = -np.sqrt(g/(n-g))
     if n <= g:
