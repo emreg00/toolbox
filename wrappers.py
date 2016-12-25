@@ -14,6 +14,11 @@ def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
     return uniprot_to_geneid
 
 
+def get_uniprot_to_symbol(uniprot_symbol_file, uniprot_ids):
+    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_symbol_file, uniprot_ids, only_min=False)
+    return uniprot_to_geneid
+
+
 def get_geneid_symbol_mapping(mapping_file):
     geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     return geneid_to_names, name_to_geneid
@@ -72,6 +77,8 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', R_header=
 	    gexp = (gexp - gexp.mean(axis=1)[:, numpy.newaxis]) / gexp.std(axis=1, ddof=1)[:, numpy.newaxis]
 	if "abs" in process:
 	    gexp = numpy.abs(gexp)
+	#if "na.rm" in process:
+	#    idx = numpy.where(numpy.isnan(a)) # need to remove rows with NAs
 	#print gexp.shape, gexp_norm.shape
 	#print gexp[0,0], gexp_norm[0,0]
 	#return gene_to_values, cell_line_to_idx
@@ -160,18 +167,23 @@ def get_sample_mapping(file_name, labels_case, labels_control=None):
 
 ##### Disease, pathway, comorbidity, symptom info related #####
 
-def get_pathway_info(pathway_file, prefix=None, nodes=None):
+def get_pathway_info(pathway_file, prefix=None, nodes=None, max_pathway_size=None):
     """
     nodes to filter geneids that are not in the network
     prefix: kegg | reactome | biocarta
     """
     pathway_to_geneids, geneid_to_pathways = parse_msigdb.get_msigdb_info(pathway_file, prefix)
-    if nodes is not None:
+    if nodes is not None or max_pathway_size is not None:
 	pathway_to_geneids_mod = {}
 	for pathway, geneids in pathway_to_geneids.iteritems():
-	    geneids_mod = geneids & nodes
-	    if len(geneids_mod) > 0:
-		pathway_to_geneids_mod[pathway] = geneids_mod 
+	    if max_pathway_size is not None:
+		if len(geneids) > max_pathway_size:
+		    continue
+	    if nodes is not None:
+		geneids &= nodes
+		if len(geneids) == 0:
+		    continue
+	    pathway_to_geneids_mod[pathway] = geneids
 	pathway_to_geneids = pathway_to_geneids_mod
     return pathway_to_geneids
 
@@ -250,12 +262,14 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
 	return None # At least one of the node group not in network
     d = calculate_closest_distance(network, nodes_from, nodes_to)
+    if bins is None and (nodes_from_random is None or nodes_to_random is None):
+	bins = network_utilities.get_degree_binning(network, min_bin_size) 
     if nodes_from_random is None:
 	nodes_from_random = get_random_nodes(nodes_from, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     if nodes_to_random is None:
 	nodes_to_random = get_random_nodes(nodes_to, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     random_values_list = zip(nodes_from_random, nodes_to_random)
-    values = numpy.empty(n_random)
+    values = numpy.empty(len(nodes_from_random)) #n_random
     for i, values_random in enumerate(random_values_list):
 	nodes_from, nodes_to = values_random
 	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
@@ -309,26 +323,37 @@ def create_node_file(node_to_score, nodes, node_file, background_score = 0.01):
     return
 
 
-def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir, executable_path = None, background_score = 0.01, qname=None): 
+def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir, executable_path = None, background_score = 0.01, qname=None, method='s'): 
     # Create node file
     node_file = "%s%s.node" % (output_dir, phenotype)
     create_node_file(node_to_score, network_nodes, node_file, background_score)
-    output_file = "%s%s.ns" % (output_dir, phenotype)
-    n_repetition = 3 
-    n_iteration = 2 
+    output_file = "%s%s.n%s" % (output_dir, phenotype, method)
     # Get and run the GUILD command
     #print strftime("%H:%M:%S - %d %b %Y") #, score_command
-    score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    if method == 's': 
+	n_repetition = 3 
+	n_iteration = 2 
+	score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    elif method == 'r':
+	n_iteration = 50 
+	score_command = ' -s r -n "%s" -e "%s" -o "%s" -i %d' % (node_file, network_file, output_file, n_iteration)
+    elif method == 'p':
+	score_command = ' "%s" "%s" "%s" 1' % (node_file, network_file, output_file)
+    else:
+	raise NotImplementedError("method %s" % method) 
     if qname is None:
 	if executable_path is None:
-	    executable_path = "guild" # assuming accessible guild executable
+	    if method in ["s", "r"]:
+		executable_path = "guild" # assuming accessible guild executable
+	    else:
+		executable_path = "netprop.sh" # assuming accessible bash script calling R 
 	score_command = executable_path + score_command
 	os.system(score_command)
     else:
 	#os.system("qsub -cwd -o out -e err -q %s -N %s -b y %s" % (qname, scoring_type, score_command))
 	#print "qsub -cwd -o out -e err -q %s -N guild_%s -b y %s" % (qname, drug, score_command)
 	print "%s" % (score_command.replace('"', ''))
-    return
+    return score_command
 
 
 ### Functional enrichment related ###

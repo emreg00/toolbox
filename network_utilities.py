@@ -350,6 +350,28 @@ def get_closest_nodes_from_other_set(sp, geneids_source, geneids_target, n_close
     return source_to_target_distance
 
 
+def get_source_to_target_average_distance(network, geneids_source, geneids_target, distance="shortest"):
+    """
+    Returns average/min distance to target nodes for each source node
+    """
+    if distance == "tsesolc":
+	return get_source_to_target_average_distance(network, geneids_target, geneids_source, distance="closest")
+    vals = []
+    for geneid in geneids_source:
+	values = []
+	for geneid_target in geneids_target:
+	    val = get_shortest_path_length_between(network, geneid, geneid_target)
+	    values.append(val)
+	if distance == "shortest":
+	    val = numpy.mean(values) 
+	elif distance == "closest":
+	    val = min(values)
+	else:
+	    raise ValueError("Unknown distance type " + distance)
+	vals.append(val)
+    return numpy.mean(vals) 
+
+ 
 def get_source_to_average_target_distance(sp, geneids_source, geneids_target, distance="shortest", parameters={}, target_mean_and_std = None, exclude_self = False):
     """
     Returns average/min distance to target nodes for each source node

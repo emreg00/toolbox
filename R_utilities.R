@@ -17,6 +17,17 @@ cbPalette.set <- brewer.pal(8,"Set1")
 cbPalette.pastel <- brewer.pal(8,"Pastel1")
 cbPalette.accent <- brewer.pal(8,"Accent")
 
+### Replicating confidence intervals
+get.confidence.interval<-function(asample) {
+    a = t.test(asample)
+    m = mean(asample)
+    s = sd(asample)
+    q = qt(.975, df = length(asample)-1)
+    #q = quantile(rt(1000000, length(asample)), probs=seq(0,1,by=0.025))["97.5%"]
+    ci = m + q * s / sqrt(length(asample))
+}
+
+
 ### Analytical functions
 get.z.score<-function(val, values) {
     z = (val - mean(values)) / sd(values)

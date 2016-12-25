@@ -28,7 +28,7 @@ def main():
     return
 
 
-def get_uniprot_to_geneid(file_name, uniprot_ids=None):
+def get_uniprot_to_geneid(file_name, uniprot_ids=None, only_min=True):
     """
     wget ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz
     zcat HUMAN_9606_idmapping_selected.tab.gz | cut -f 1,3 > idmapping.tab
@@ -46,7 +46,8 @@ def get_uniprot_to_geneid(file_name, uniprot_ids=None):
 	    continue
 	if uniprot_ids is not None and uniprot not in uniprot_ids:
 	    continue
-	geneid = str(min(map(int, geneid.split("; "))))
+	if only_min:
+	    geneid = str(min(map(int, geneid.split("; "))))
 	uniprot_to_geneid[uniprot] = geneid
     f.close()
     return uniprot_to_geneid

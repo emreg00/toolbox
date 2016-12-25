@@ -136,13 +136,32 @@ D 1 I
 E 1 F
 ```
 
-The inputs are the two groups of nodes and the network. 
+The inputs are the two groups of nodes and the network.
+The proximity is not symmetric (if nodes_from and nodes_to are swapped, 
+the results would be different, see below for details).
 The nodes in the network are binned such that the nodes in the same bin have similar degrees. 
-For real networks, use a larger `min_bin_size` (e.g., 100). 
+For real networks, use a larger `min_bin_size` (e.g., 10, 25, 50, 100, see below for choosing the bin size). 
 The random nodes matching the number and the degree of the nodes in the node sets are chosen
 using these bins.
 The average distance from the nodes in one set to the other is then calculated and compared to the 
 random expectation (the distances observed in random groups).
+
+### Proximity calculation considerations
+
+* From/to nodes: Note that proximity, by definition, is not symmetric and the order of `nodes_from` and 
+`nodes_to` makes a difference. If you do not have an intrinsic relationship between 
+the two sets of nodes (the proximity from one to the other, such as from drugs to diseases),
+you can use the node set smaller in size.
+
+* Degree binning: For random selection of nodes with similar degrees to those in the original node sets, 
+proximity uses binning of similar degree-nodes. This is because, high-degree nodes in the network are
+less common and the randomization algorithm would choose always the same set of nodes if binning is not used.
+That being said, if the bins are too large, the nodes within the bin are not a good representative of 
+the original nodes (spanning many nodes with different degrees). Accordingly, the bins should contain enough
+number of nodes that would allow a representative random sampling. In each bin the nodes with
+degree higher degree (e.g., k+1, if k is the degree of the nodes in the current bin) are added iteratively
+till `min_bin_size` is reached. For instance, `min_bin_size` can be chosen to be at least twice 
+as large as the max number of nodes in the node sets.
 
 
 ## Citation
