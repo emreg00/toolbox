@@ -242,7 +242,7 @@ def overlap_significance(geneids1, geneids2, nodes):
 
 
 ##### Proximity related #####
-def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456):
+def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
     #distance = "closest"
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
@@ -251,9 +251,9 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
 	return None # At least one of the node group not in network
     d = calculate_closest_distance(network, nodes_from, nodes_to)
     if nodes_from_random is None:
-	nodes_from_random = get_random_nodes(nodes_from, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	nodes_from_random = get_random_nodes(nodes_from, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     if nodes_to_random is None:
-	nodes_to_random = get_random_nodes(nodes_to, network, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	nodes_to_random = get_random_nodes(nodes_to, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     random_values_list = zip(nodes_from_random, nodes_to_random)
     values = numpy.empty(n_random)
     for i, values_random in enumerate(random_values_list):
