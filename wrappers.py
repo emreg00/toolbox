@@ -260,12 +260,12 @@ def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_r
     if nodes_random is None:
 	nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     network_sub = network.subgraph(nodes)
-    component_nodes = networkx.connected_components(network_sub)[0]
+    component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
     d = len(component_nodes)
     values = numpy.empty(len(nodes_random)) 
     for i, nodes in enumerate(nodes_random):
 	network_sub = network.subgraph(nodes)
-	component_nodes = networkx.connected_components(network_sub)[0]
+	component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
 	values[i] = len(component_nodes)
     m, s = numpy.mean(values), numpy.std(values)
     if s == 0:
