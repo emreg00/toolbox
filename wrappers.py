@@ -253,6 +253,28 @@ def overlap_significance(geneids1, geneids2, nodes):
     return n, n1, n2, pval
 
 
+##### LCC related #####
+def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
+    if bins is None and nodes_random is None:
+	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    if nodes_random is None:
+	nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    network_sub = network.subgraph(nodes)
+    component_nodes = networkx.connected_components(network_sub)[0]
+    d = len(component_nodes)
+    values = numpy.empty(len(nodes_random)) 
+    for i, nodes in enumerate(nodes_random):
+	network_sub = network.subgraph(nodes)
+	component_nodes = networkx.connected_components(network_sub)[0]
+	values[i] = len(component_nodes)
+    m, s = numpy.mean(values), numpy.std(values)
+    if s == 0:
+	z = 0.0
+    else:
+	z = (d - m) / s
+    return d, z, (m, s) 
+
+
 ##### Proximity related #####
 def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
     #distance = "closest"
