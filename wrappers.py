@@ -188,7 +188,11 @@ def get_pathway_info(pathway_file, prefix=None, nodes=None, max_pathway_size=Non
     return pathway_to_geneids
 
 
-def get_diseasome_genes(diseasome_file, nodes=None):
+def get_diseasome_genes(diseasome_file, nodes=None, network=None):
+    """
+    If nodes is not None, keep only nodes in the network
+    If network is not None, keep only LCC
+    """
     disease_to_genes = {}
     disease_to_category = {}
     for line in open(diseasome_file):
@@ -200,6 +204,9 @@ def get_diseasome_genes(diseasome_file, nodes=None):
 	    genes &= nodes
 	    if len(genes) == 0:
 		continue
+	if network is not None:
+	    network_sub = network.subgraph(genes)
+	    genes = network_utilities.get_connected_components(network_sub, False)[0]
 	disease_to_genes[disease] = genes
 	disease_to_category[disease] = category
     return disease_to_genes, disease_to_category
