@@ -204,7 +204,7 @@ def get_mesh_id_mapping(desc_file, rel_file, only_diseases = True, dump_file = N
     umls = UMLS(desc_file, rel_file)
     concept_ids_disease = None
     if only_diseases: #! This excludes several synoyms (includes only snonyms of the concept id that is part of the MeSH diseases)
-	g = get_mesh_disease_ontology(desc_file, rel_file, umls=umls)
+	g = get_mesh_disease_ontology(desc_file, rel_file, umls=umls, dump_file=dump_file+".ontology")
 	concept_ids_disease = set(g.nodes())
     source_id_to_concept = {} # only main headers
     source_id_to_concepts = {} # all concepts including synonyms

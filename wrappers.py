@@ -4,7 +4,8 @@
 # e.g. 10/2015
 #######################################################################
 import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReader
-import parse_uniprot, parse_ncbi
+import parse_umls
+import parse_uniprot, parse_ncbi, OBO
 import csv, numpy, os, cPickle
 
 ##### Id mapping related #####
@@ -24,6 +25,58 @@ def get_geneid_symbol_mapping(mapping_file):
     return geneid_to_names, name_to_geneid
 
 
+def get_mesh_id_mapping(desc_file, rel_file, dump_file = None):
+    """ 
+    Get all concept id - mesh id mapping (also gets entry names in addition to main header)
+    """
+    #dump_file = CONFIG.get("umls_dir") + "/mapping.pcl"
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = parse_umls.get_mesh_id_mapping(desc_file, rel_file, dump_file = dump_file)
+    return mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms
+
+
+def get_mesh_disease_ontology(desc_file, rel_file, dump_file = None):
+    #dump_file = CONFIG.get("umls_dir") + "/ontology.pcl"
+    g = parse_umls.get_mesh_disease_ontology(desc_file, rel_file, dump_file = dump_file)
+    return g
+
+
+def get_medic_mesh_id_mapping(medic_file):
+    medic = OBO.OBO(medic_file, save_synonyms = True)
+    name_to_id = {}
+    id_to_mesh_ids = {}
+    for node, data in medic.g.nodes_iter(data=True):
+	name = data['n']
+	name_to_id[name] = node
+	if 's' in data:
+	    for name in data['s']:
+		name_to_id[name] = node
+	if node.startswith("MESH:D"):
+	    id_to_mesh_ids[node] = [ node[5:] ]
+	else:
+	    for node2, type2 in medic.get_term_relations(node):
+		if type2 == "is_a":
+		    if node2.startswith("MESH:D"):
+			id_to_mesh_ids.setdefault(node, []).append(node2[5:])
+    return name_to_id, id_to_mesh_ids 
+
+
+def get_mesh_disease_category_mapping(desc_file, rel_file, dump_file = None):
+    #dump_file = CONFIG.get("umls_dir") + "/ontology.pcl"
+    mesh_id_to_top_ids = parse_umls.get_mesh_id_to_disease_category(desc_file, rel_file, dump_file)
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping()
+    mesh_name_to_parents = {}
+    for child, parents in mesh_id_to_top_ids.iteritems():
+	name_child = mesh_id_to_name[concept_id_to_mesh_id[child]]
+	values = []
+	for parent in parents:
+	    name_parent = mesh_id_to_name[concept_id_to_mesh_id[parent]]
+	    values.append(name_parent.lower())
+	values.sort()
+	mesh_name_to_parents[name_child.lower()] = values
+    #print mesh_name_to_parents["asthma"], mesh_name_to_parents["psoriasis"]
+    return mesh_name_to_parents
+
+
 ##### Network related #####
 
 def get_network(network_file, only_lcc):
@@ -40,6 +93,38 @@ def get_network(network_file, only_lcc):
 		f.write("%s 1 %s\n" % (u, v))
 	    f.close()
     return network
+
+
+def create_functional_network(links_file, mapping_file, cutoff = 900): 
+    #string_dir = CONFIG.get("string_dir") + "/"
+    #links_file = string_dir + CONFIG.get("string_links_file")
+    #mapping_file = string_dir + CONFIG.get("string_mapping_file")
+    output_file = CONFIG.get("network_file")
+    parse_string.get_interactions(links_file, mapping_file, output_file, cutoff) #, include_score=True) 
+    #network = get_network()
+    #print len(network.nodes()), len(network.edges())
+    return
+
+
+def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
+    if bins is None and nodes_random is None:
+	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    if nodes_random is None:
+	nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    network_sub = network.subgraph(nodes)
+    component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
+    d = len(component_nodes)
+    values = numpy.empty(len(nodes_random)) 
+    for i, nodes in enumerate(nodes_random):
+	network_sub = network.subgraph(nodes)
+	component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
+	values[i] = len(component_nodes)
+    m, s = numpy.mean(values), numpy.std(values)
+    if s == 0:
+	z = 0.0
+    else:
+	z = (d - m) / s
+    return d, z, (m, s) 
 
 
 ##### Gene expression related #####
@@ -212,12 +297,12 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
     return disease_to_genes, disease_to_category
 
 
-def get_comorbidity_info(correlation_type="phi", only_significant=False):
+def get_comorbidity_info(comorbidity_file, correlation_type="phi", only_significant=False):
     """
     Parse HuDiNe data
     correlation_type: phi (pearson correlation) | RR (favors rare disease pairs)
     """
-    comorbidity_file = CONFIG.get("comorbidity_file")
+    #comorbidity_file = CONFIG.get("comorbidity_file")
     f = open(comorbidity_file)
     header_to_idx = dict((word, i) for i, word in enumerate(f.readline().strip().split("\t")))
     disease_to_disease_comorbidity = {}
@@ -234,10 +319,11 @@ def get_comorbidity_info(correlation_type="phi", only_significant=False):
     return disease_to_disease_comorbidity
 
 
-def get_symptom_info():
+def get_symptom_info(symptom_file):
     disease_to_symptoms = {}
     symptom_to_diseases = {}
-    f = open(CONFIG.get("symptom_file"))
+    #symptom_file = CONFIG.get("symptom_file")
+    f = open(symptom_file)
     for line in f:
 	words = line.strip("\n").split("\t")
 	symptom, disease, n, score = words
@@ -258,28 +344,6 @@ def overlap_significance(geneids1, geneids2, nodes):
     N = len(nodes)
     pval = stat_utilities.hypergeometric_test_numeric(n, n1, N, n2)
     return n, n1, n2, pval
-
-
-##### LCC related #####
-def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
-    if bins is None and nodes_random is None:
-	bins = network_utilities.get_degree_binning(network, min_bin_size) 
-    if nodes_random is None:
-	nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
-    network_sub = network.subgraph(nodes)
-    component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
-    d = len(component_nodes)
-    values = numpy.empty(len(nodes_random)) 
-    for i, nodes in enumerate(nodes_random):
-	network_sub = network.subgraph(nodes)
-	component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
-	values[i] = len(component_nodes)
-    m, s = numpy.mean(values), numpy.std(values)
-    if s == 0:
-	z = 0.0
-    else:
-	z = (d - m) / s
-    return d, z, (m, s) 
 
 
 ##### Proximity related #####
