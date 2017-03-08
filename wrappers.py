@@ -7,6 +7,7 @@ import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReade
 import parse_umls
 import parse_uniprot, parse_ncbi, OBO
 import csv, numpy, os, cPickle
+from random import shuffle
 
 ##### Id mapping related #####
 
@@ -107,10 +108,16 @@ def create_functional_network(links_file, mapping_file, cutoff = 900):
 
 
 def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
-    if bins is None and nodes_random is None:
-	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    # Degree matching problematic for small bin sizes
+    #if bins is None and nodes_random is None:
+    #	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    network_nodes = list(network.nodes())
     if nodes_random is None:
-	nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	#nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+	nodes_random = []
+	for i in xrange(n_random):
+	    shuffle(network_nodes)
+	    nodes_random.append(network_nodes[:len(nodes)])
     network_sub = network.subgraph(nodes)
     component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
     d = len(component_nodes)
