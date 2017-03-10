@@ -64,6 +64,15 @@ Parsers available for the following resources:
 The parsers are provided "as is" and might not work due to updates on the data format of these resources. Please contact me for suggestions, bug reports and enquiries.
 
 
+## External packages (Optional)
+
+Some functions in toolbox rely on the following packages. The package will load properly but certain functionality might not be available.
+
+* [GenRev](https://bioinfo.uth.edu/GenRev.html) for Steiner-tree algorithm implementation
+* [negex](https://github.com/chapmanbe/negex) for identifying negatiation in textual medical records
+* [FuncAssoc client](https://gist.github.com/yy/869845) for connecting FuncAssociate server (incorporated in the repository)
+
+
 ## Wrappers
 
 [wrappers.py](wrappers.py) provides an easy to use interface to various methods I commonly use. It is continuously under development. Currently it contains methods to 
