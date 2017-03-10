@@ -160,6 +160,16 @@ def get_shortest_paths(G, dump_file):
 def get_shortest_path_lengths(G, dump_file):
     return networkx.shortest_path_length(G)
 
+@dumper
+def get_shortest_path_lengths_subset(G, nodes_subset, dump_file):
+    d = networkx.shortest_path_length(G)
+    d_new = dict((node, {}) for node in nodes_subset)
+    for node in nodes_subset:
+	if node not in d:
+	    continue
+	d_new[node] = dict((node2, d[node][node2]) for node2 in nodes_subset)
+    return d_new
+
 def get_shortest_path_between(G, source_id, target_id):
     return networkx.shortest_path(G, source_id, target_id)
 
