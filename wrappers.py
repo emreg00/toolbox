@@ -111,8 +111,8 @@ def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_r
     # Degree matching problematic for small bin sizes
     #if bins is None and nodes_random is None:
     #	bins = network_utilities.get_degree_binning(network, min_bin_size) 
-    network_nodes = list(network.nodes())
     if nodes_random is None:
+	network_nodes = list(network.nodes())
 	#nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
 	nodes_random = []
 	for i in xrange(n_random):
@@ -354,14 +354,14 @@ def overlap_significance(geneids1, geneids2, nodes):
 
 
 ##### Proximity related #####
-def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456):
+def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None):
     #distance = "closest"
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
     nodes_network = set(network.nodes())
     if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
 	return None # At least one of the node group not in network
-    d = calculate_closest_distance(network, nodes_from, nodes_to)
+    d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     if bins is None and (nodes_from_random is None or nodes_to_random is None):
 	bins = network_utilities.get_degree_binning(network, min_bin_size) 
     if nodes_from_random is None:
@@ -373,7 +373,7 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     for i, values_random in enumerate(random_values_list):
 	nodes_from, nodes_to = values_random
 	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
-	values[i] = calculate_closest_distance(network, nodes_from, nodes_to)
+	values[i] = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     #pval = float(sum(values <= d)) / len(values)
     m, s = numpy.mean(values), numpy.std(values)
     if s == 0:
@@ -383,16 +383,26 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     return d, z, (m, s) #(z, pval)
 
 
-def calculate_closest_distance(network, nodes_from, nodes_to):
+def calculate_closest_distance(network, nodes_from, nodes_to, lengths=None):
     values_outer = []
-    for node_from in nodes_from:
-	values = []
-	for node_to in nodes_to:
-	    val = network_utilities.get_shortest_path_length_between(network, node_from, node_to)
-	    values.append(val)
-	d = min(values)
-	#print d,
-	values_outer.append(d)
+    if lengths is None:
+	for node_from in nodes_from:
+	    values = []
+	    for node_to in nodes_to:
+		val = network_utilities.get_shortest_path_length_between(network, node_from, node_to)
+		values.append(val)
+	    d = min(values)
+	    #print d,
+	    values_outer.append(d)
+    else:
+	for node_from in nodes_from:
+	    values = []
+	    vals = lengths[node_from]
+	    for node_to in nodes_to:
+		val = vals[node_to]
+		values.append(val)
+	    d = min(values)
+	    values_outer.append(d)
     d = numpy.mean(values_outer)
     #print d
     return d
