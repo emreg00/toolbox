@@ -979,9 +979,11 @@ def get_center_of_subnetwork(sp, nodes):
     return center, center_values
 
 
-def get_degree_binning(g, bin_size):
+def get_degree_binning(g, bin_size, lengths=None):
     degree_to_nodes = {}
     for node, degree in g.degree().iteritems():
+	if lengths is not None and node not in lengths:
+	    continue
 	degree_to_nodes.setdefault(degree, []).append(node)
     values = degree_to_nodes.keys()
     values.sort()

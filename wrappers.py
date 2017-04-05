@@ -355,6 +355,11 @@ def overlap_significance(geneids1, geneids2, nodes):
 
 ##### Proximity related #####
 def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None):
+    """
+    Calculate proximity from nodes_from to nodes_to
+    If degree binning or random nodes are not given, they are generated
+    lengths: precalculated shortest path length dictionary
+    """
     #distance = "closest"
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
@@ -363,7 +368,7 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
 	return None # At least one of the node group not in network
     d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     if bins is None and (nodes_from_random is None or nodes_to_random is None):
-	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+	bins = network_utilities.get_degree_binning(network, min_bin_size, lengths) # if lengths is given, it will only use those nodes
     if nodes_from_random is None:
 	nodes_from_random = get_random_nodes(nodes_from, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
     if nodes_to_random is None:
