@@ -212,24 +212,24 @@ def ksrepo_score(golds, candidates):
 
 def ks_score(golds, candidates, N=None):
     """
-    Given a golds set (genes / pathways), 
+    Given a ranked golds set (genes / pathways), 
     calculates KS score as proposed by Mootha et al.
-    for the ranked/prioritized candidate list
+    for the candidate list
     """
-    golds = set(golds)
+    candidates = set(candidates)
     score = 0
     max_score = None
     if N is None:
-	n = len(candidates)
+	n = len(golds)
     else:
 	n = N
-    g = float(len(golds))
+    g = float(len(candidates))
     val_in = np.sqrt((n-g)/g)
     val_out = -np.sqrt(g/(n-g))
     if n <= g:
-	raise ValueError("Candidate set is smaller than gold set")
-    for candidate in candidates:
-	if candidate in golds:
+	raise ValueError("Gold set is smaller than candidate set")
+    for gold in golds:
+	if gold in candidates:
 	    score += val_in 
 	else:
 	    score += val_out 

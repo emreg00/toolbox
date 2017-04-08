@@ -306,7 +306,8 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
 
 def get_comorbidity_info(comorbidity_file, correlation_type="phi", only_significant=False):
     """
-    Parse HuDiNe data
+    Parse HuDiNe data from comorbidity_new.tsv
+    #! Potentiall buggy, parse AllNet3 and map ICD9 to MeSH using DO
     correlation_type: phi (pearson correlation) | RR (favors rare disease pairs)
     """
     #comorbidity_file = CONFIG.get("comorbidity_file")
@@ -326,21 +327,28 @@ def get_comorbidity_info(comorbidity_file, correlation_type="phi", only_signific
     return disease_to_disease_comorbidity
 
 
-def get_symptom_info(symptom_file):
+def get_symptom_info(symptom_file, tfidf_cutoff=None):
+    """
+    Parse Zhou et al supplementary s4. A cutoff of 3.5 is likely to filter spurious associations.
+    """
     disease_to_symptoms = {}
     symptom_to_diseases = {}
+    disease_to_symptom_to_score = {}
     #symptom_file = CONFIG.get("symptom_file")
     f = open(symptom_file)
+    f.readline()
     for line in f:
 	words = line.strip("\n").split("\t")
 	symptom, disease, n, score = words
 	symptom = symptom.lower()
 	disease = disease.lower()
-	#if float(score) < 3:
-	#    continue
+	if tfidf_cutoff is not None and not float(score) >= tfidf_cutoff:
+	    continue
 	disease_to_symptoms.setdefault(disease, set()).add(symptom)
 	symptom_to_diseases.setdefault(symptom, set()).add(disease)
-    return disease_to_symptoms, symptom_to_diseases
+	d = disease_to_symptom_to_score.setdefault(disease, {})
+	d[symptom] = float(score)
+    return disease_to_symptoms, symptom_to_diseases, disease_to_symptom_to_score
 
 
 ##### Statistics related #####
