@@ -64,7 +64,7 @@ def get_medic_mesh_id_mapping(medic_file):
 def get_mesh_disease_category_mapping(desc_file, rel_file, dump_file = None):
     #dump_file = CONFIG.get("umls_dir") + "/ontology.pcl"
     mesh_id_to_top_ids = parse_umls.get_mesh_id_to_disease_category(desc_file, rel_file, dump_file)
-    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping()
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(desc_file, rel_file, dump_file)
     mesh_name_to_parents = {}
     for child, parents in mesh_id_to_top_ids.iteritems():
 	name_child = mesh_id_to_name[concept_id_to_mesh_id[child]]
@@ -76,6 +76,67 @@ def get_mesh_disease_category_mapping(desc_file, rel_file, dump_file = None):
 	mesh_name_to_parents[name_child.lower()] = values
     #print mesh_name_to_parents["asthma"], mesh_name_to_parents["psoriasis"]
     return mesh_name_to_parents
+
+
+def get_do_mesh_id_mapping(do_file):
+    do = OBO.OBO(do_file, save_synonyms = True)
+    name_to_id = {}
+    id_to_mesh_ids = {}
+    mesh_id_to_type_to_ids = {}
+    for node, data in do.g.nodes_iter(data=True):
+	name = data['n']
+	name_to_id[name] = node
+	if 's' in data:
+	    for name in data['s']:
+		name_to_id[name] = node
+	id_types = ["OMIM", "ICD9CM", "ICD10CM"] #"MESH"
+	id_dict = {} #dict((id_type, []) for id_type in id_types) 
+	mesh_ids = []
+	for xref in data["xref"]:
+	    vals = xref.split(":")
+	    if len(vals) != 2:
+		print "Ontology format inconsistency!", vals
+		continue
+	    id_type, id_val = vals
+	    if id_type == "MESH":
+		mesh_ids.append(id_val)
+	    elif id_type in id_types:
+		id_dict.setdefault(id_type, []).append(id_val)
+	if len(mesh_ids) == 0:
+	    continue
+	id_to_mesh_ids[node] = mesh_ids
+	for mesh_id in mesh_ids:
+	    #!
+	    #mesh_id_to_type_to_ids[mesh_id] = id_dict
+	    d = mesh_id_to_type_to_ids.setdefault(mesh_id, {})
+	    for id_type, id_vals in id_dict.items():
+		if id_type in d:
+		    d[id_type] = list(set(id_vals + d[id_type]))
+		else:
+		    d[id_type] = id_vals
+    return name_to_id, id_to_mesh_ids, mesh_id_to_type_to_ids
+
+
+def get_icd_to_mesh_ids(disease_ontology_file, id_type="ICD9CM"):
+    """
+    id_type: ICD9CM | ICD10CM
+    """
+    name_to_id, id_to_mesh_ids, mesh_id_to_type_to_ids = get_do_mesh_id_mapping(disease_ontology_file)
+    print mesh_id_to_type_to_ids.items()[:5] #!
+    icd_to_mesh_ids = {}
+    for mesh_id, type_to_ids in mesh_id_to_type_to_ids.iteritems():
+	if id_type in type_to_ids:
+	    for val in type_to_ids[id_type]:
+		words = val.split("-")
+		if len(words) > 1:
+		    icd1 = int(words[0].split(".")[0])
+		    icd2 = int(words[1].split(".")[0])
+		    icds = map(str, range(icd1, icd2+1))
+		else:
+		    icds = words[0].split(".")[0]
+		for icd in icds:
+		    icd_to_mesh_ids.setdefault(icd, []).append(mesh_id)
+    return icd_to_mesh_ids
 
 
 ##### Network related #####
@@ -304,12 +365,42 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
     return disease_to_genes, disease_to_category
 
 
-def get_comorbidity_info(comorbidity_file, correlation_type="phi", only_significant=False):
+def get_comorbidity_info(comorbidity_file, disease_ontology_file, mesh_dump, correlation_type="RR", only_significant=False):
     """
-    Parse HuDiNe data from comorbidity_new.tsv
-    #! Potentiall buggy, parse AllNet3 and map ICD9 to MeSH using DO
+    Parse HuDiNe data from AllNet3 and map ICD9 to MeSH using DO
     correlation_type: phi (pearson correlation) | RR (favors rare disease pairs)
     """
+    icd_to_mesh_ids = get_icd_to_mesh_ids(disease_ontology_file, id_type="ICD9CM")
+    print icd_to_mesh_ids.items()[:5] #!
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(None, None, dump_file = mesh_dump)
+    print mesh_id_to_name.items()[:5] #!
+    f = open(comorbidity_file)
+    header_to_idx = dict((word, i) for i, word in enumerate(f.readline().strip().split("\t")))
+    disease_to_disease_comorbidity = {}
+    for line in f:
+	words = line.strip().split("\t")
+	icd1, icd2 = words[:2]
+	if only_significant and significance == "0":
+	    continue
+	if icd1 not in icd_to_mesh_ids or icd2 not in icd_to_mesh_ids:
+	    continue
+	val = float(words[header_to_idx[correlation_type]]) # idx:5
+	for mesh1 in icd_to_mesh_ids[icd1]:
+	    if mesh1 in mesh_id_to_name:
+		disease1 = mesh_id_to_name[mesh1]
+	    for mesh2 in icd_to_mesh_ids[icd2]:
+		if mesh2 in mesh_id_to_name:
+		    disease2 = mesh_id_to_name[mesh2]
+		d = disease_to_disease_comorbidity.setdefault(disease1, {})
+		if disease2 in d:
+		    if d[disease2] > val: # skip if the existing comorbidity value is higher
+			continue
+		d[disease2] = val 
+		d = disease_to_disease_comorbidity.setdefault(disease2, {})
+		d[disease1] = val
+    f.close()
+    return disease_to_disease_comorbidity
+    # Parse HuDiNe data from potentially buggy comorbidity_new.tsv
     #comorbidity_file = CONFIG.get("comorbidity_file")
     f = open(comorbidity_file)
     header_to_idx = dict((word, i) for i, word in enumerate(f.readline().strip().split("\t")))
