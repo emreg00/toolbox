@@ -63,11 +63,6 @@ def getOboGraph(fname, save_synonyms = False, exclude_obsolete = True):
             name = obo_file.next().strip()[6:]
             obo.add_node(id)
             obo.node[id]['n'] = name
-	    line = obo_file.next().strip()
-	    if line.startswith("namespace"):
-		# Expect Namespace in the next line
-		namespace = line[11:]
-		obo.node[id]['t'] = namespace
             # Alternative ids 
             obo.node[id]['alt_id'] = []
             # Cross references
@@ -79,7 +74,11 @@ def getOboGraph(fname, save_synonyms = False, exclude_obsolete = True):
                 stanza = obo_file.next().strip()
                 if stanza=='':
                     break
-                
+		# Namespace 
+		if stanza.startswith("namespace"):
+		    namespace = stanza[11:]
+		    obo.node[id]['t'] = namespace
+		    continue
                 stanza = Relationship(stanza, save_synonyms)
 		if stanza.type == "ignore":
 		    continue
