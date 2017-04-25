@@ -3,7 +3,7 @@
 # drug and network analysis
 # e.g. 10/2015
 #######################################################################
-import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReader
+import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReader, functional_enrichment
 import parse_umls
 import parse_uniprot, parse_ncbi, OBO
 import csv, numpy, os, cPickle
@@ -134,7 +134,7 @@ def get_icd_to_mesh_ids(disease_ontology_file, id_type="ICD9CM"):
 		else:
 		    icds = [ words[0].split(".")[0] ]
 		for icd in icds:
-		    icd_to_mesh_ids.setdefault(icd, []).append(mesh_id)
+		    icd_to_mesh_ids.setdefault(icd, set()).add(mesh_id)
     return icd_to_mesh_ids
 
 
@@ -397,8 +397,6 @@ def get_comorbidity_info(comorbidity_file, disease_ontology_file, mesh_dump, cor
 		    continue
 		disease2 = mesh_id_to_name[mesh2].lower()
 		disease1_mod, disease2_mod = sorted((disease1, disease2))
-		if disease1_mod == "immunologic deficiency syndromes" and disease2_mod == "spinocerebellar ataxias":
-		    print icd1, disease1, icd2, disease2, val #!
 		d = disease_to_disease_comorbidity.setdefault(disease1, {})
 		if disease2 in d:
 		    if d[disease2] > val: # skip if the existing comorbidity value is higher
@@ -406,8 +404,8 @@ def get_comorbidity_info(comorbidity_file, disease_ontology_file, mesh_dump, cor
 		d[disease2] = val 
 		d = disease_to_disease_comorbidity.setdefault(disease2, {})
 		d[disease1] = val
-    #! there is inconsistency in terms of size
-    print len(disease_to_disease_comorbidity), len(disease_to_disease_comorbidity.values()[0].items()) #!
+		#print icd1, mesh1, disease1, icd2, mesh2, disease2, val 
+    #print len(disease_to_disease_comorbidity), disease_to_disease_comorbidity.values()[0].items()[:5]
     return disease_to_disease_comorbidity 
     # Parse HuDiNe data from potentially buggy comorbidity_new.tsv
     #comorbidity_file = CONFIG.get("comorbidity_file")
@@ -494,6 +492,34 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     else:
 	z = (d - m) / s
     return d, z, (m, s) #(z, pval)
+
+
+def calculate_proximity_multiple(network, from_file=None, to_file=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None, out_file="output.txt"):
+    """
+    Run proximity on each entries of from and to files in a pairwise manner
+    output is saved in out_file (e.g., output.txt)
+    """
+    nodes = set(network.nodes())
+    drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
+    drug_to_targets = dict((drug, nodes & targets) for drug, targets in drug_to_targets.iteritems())
+    disease_to_genes, disease_to_category = get_diseasome_genes(to_file, nodes = nodes)
+    # Calculate proximity values
+    print len(drug_to_targets), len(disease_to_genes)
+    # Get degree binning 
+    bins = network_utilities.get_degree_binning(network, min_bin_size)
+    f = open(out_file, 'w')
+    for drug, nodes_from in drug_to_targets.iteritems():
+	values = []
+	for disease, nodes_to in disease_to_genes.iteritems():
+	    print drug, disease
+	    d, z, (m, s) = calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=bins, n_random=n_random, min_bin_size=min_bin_size, seed=seed, lengths=lengths)
+	    values.append((drug, disease, z, len(nodes_from), len(nodes_to), d, m, s))
+	    #f.write("%s\t%s\t%f\t%f\t%f\t%f\n" % (drug, disease, z, d, m, s))
+	values.sort(key=lambda x: x[2])
+	for drug, disease, z, k, l, d, m, s in values:
+	    f.write("%s\t%s\t%f\t%d\t%d\t%f\t%f\t%f\n" % (drug, disease, z, k, l, d, m, s))
+    f.close()
+    return 
 
 
 def calculate_closest_distance(network, nodes_from, nodes_to, lengths=None):
@@ -590,7 +616,7 @@ def check_functional_enrichment(id_list, background_id_list = None, id_type = "g
     if out_file_name is not None:
 	f_output = open(out_file_name, 'w').write
     else:
-	from stdout import sys
+	from sys import stdout 
 	f_output = stdout.write
     return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False, support = evidences, associations = None) 
 

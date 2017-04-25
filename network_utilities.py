@@ -1073,6 +1073,15 @@ def get_pairwise_distances_between_nodes(g, sources, targets=None):
     return values
 
 
+def get_interacting_pairs(g, nodes1, nodes2):
+    values = []
+    for node1 in nodes1:
+	for node2 in nodes2:
+	    if node1 == node2 or g.has_edge(node1, node2):
+		values.append((node1, node2))
+    return values
+
+
 def get_path_network(G, listNodes, path_length_cutoff=10000):
     """
     Returns a subgraph containing only nodes in listNodes
