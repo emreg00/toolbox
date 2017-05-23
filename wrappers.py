@@ -364,6 +364,20 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
     return disease_to_genes, disease_to_category
 
 
+def get_disgenet_genes(file_name):
+    disease_to_genes = {}
+    disease_to_sources = {} # not keeping sources of individual associations
+    f = open(file_name)
+    reader = csv.DictReader(filter(lambda row: row[0]!='#', f), delimiter='\t')
+    for row in reader:
+	disease = row["diseaseName"].lower()
+	sources = disease_to_sources.setdefault(disease, set())
+	sources |= set(row["sourceId"].lower().split(","))
+	disease_to_genes.setdefault(disease, set()).add(row["geneId"])
+    f.close()
+    return disease_to_genes, disease_to_sources
+
+
 def get_comorbidity_info(comorbidity_file, disease_ontology_file, mesh_dump, correlation_type="RR", only_significant=False):
     """
     Parse HuDiNe data from AllNet3 and map ICD9 to MeSH using DO
