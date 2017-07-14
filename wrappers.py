@@ -11,6 +11,25 @@ from random import shuffle
 
 ##### Id mapping related #####
 
+def convert_to_geneid(file_name, id_type, id_mapping_file):
+    """
+    Expects a file where each line is a gene name / uniprot id
+    id_type: symbol | uniprot
+    """
+    f = open(file_name)
+    genes = [ line.strip("\n") for line in f ]
+    if id_type == "symbol":
+	geneid_to_names, name_to_geneid = get_geneid_symbol_mapping(id_mapping_file)
+    elif id_type == "uniprot":
+	name_to_geneid = get_uniprot_to_geneid(id_mapping_file, uniprot_ids=None)
+    else:
+	raise ValueError("Uknown id type!")
+    geneids = set([ name_to_geneid[gene] for gene in genes if gene in name_to_geneid ])
+    genes_non = set([ gene for gene in genes if gene not in name_to_geneid ])
+    print genes_non
+    return geneids
+
+
 def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
     uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids)
     return uniprot_to_geneid
@@ -522,6 +541,7 @@ def calculate_proximity_multiple(network, from_file=None, to_file=None, n_random
     # Get degree binning 
     bins = network_utilities.get_degree_binning(network, min_bin_size)
     f = open(out_file, 'w')
+    f.write("source\ttarget\tn.source\tn.target\td\tz\n")
     for drug, nodes_from in drug_to_targets.iteritems():
 	values = []
 	for disease, nodes_to in disease_to_genes.iteritems():
@@ -531,7 +551,8 @@ def calculate_proximity_multiple(network, from_file=None, to_file=None, n_random
 	    #f.write("%s\t%s\t%f\t%f\t%f\t%f\n" % (drug, disease, z, d, m, s))
 	values.sort(key=lambda x: x[2])
 	for drug, disease, z, k, l, d, m, s in values:
-	    f.write("%s\t%s\t%f\t%d\t%d\t%f\t%f\t%f\n" % (drug, disease, z, k, l, d, m, s))
+	    #f.write("%s\t%s\t%f\t%d\t%d\t%f\t%f\t%f\n" % (drug, disease, z, k, l, d, m, s))
+	    f.write("%s\t%s\t%d\t%d\t%f\t%f\n" % (drug, disease, k, l, d, z))
     f.close()
     return 
 

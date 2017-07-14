@@ -21,6 +21,8 @@ def convert_p_values_to_z_scores(p_values, size=1000000):
     #a = np.random.normal(size) #1000000 # 10000000
     #z_scores = map(lambda x: stats.scoreatpercentile(a, 100-(100*x/2.0)), p_values)
     z_scores = stats.norm.ppf(p_values)
+    # Converting nan z score to 0 (for those with pval = 1)
+    z_scores = [ 0 if np.isnan(z) else z for z in z_scores ]
     return z_scores
 
 

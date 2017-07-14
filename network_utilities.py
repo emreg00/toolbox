@@ -163,6 +163,8 @@ def get_shortest_path_lengths(G, dump_file):
 @dumper
 def get_shortest_path_lengths_subset(G, nodes_subset, dump_file):
     d = networkx.shortest_path_length(G)
+    if nodes_subset is None:
+	return d
     d_new = dict((node, {}) for node in nodes_subset)
     for node in nodes_subset:
 	if node not in d:
@@ -266,7 +268,9 @@ def get_edge_betweenness_within_subset(G, subset, edges, consider_alternative_pa
     return edge_to_value
 
 
-def get_background_normalized_separation_distance(network, sp, targets, seeds, distance="shortest", n_random=100, n_node_in_bins=500, seed_to_equivalent_nodes = None):
+def get_background_normalized_separation_distance(network, sp, targets, seeds, distance="shortest", n_random=100, n_node_in_bins=100, seed_to_equivalent_nodes = None, seed=None):
+    if seed is not None:
+	random.seed(seed)
     # Get equivalent nodes from bins
     if seed_to_equivalent_nodes is None:
 	bins = get_degree_binning(network, n_node_in_bins)
@@ -276,7 +280,7 @@ def get_background_normalized_separation_distance(network, sp, targets, seeds, d
     values = numpy.empty(n_random)
     for i in xrange(n_random):
 	nodes = []
-	for seed, equivalents in seed_to_equivalent_nodes.iteritems():
+	for seed_node, equivalents in seed_to_equivalent_nodes.iteritems():
 	    nodes.append(random.choice(equivalents))
 	d_random = get_separation(network, sp, targets, nodes, distance = distance)
 	values[i] = d_random

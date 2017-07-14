@@ -1,8 +1,16 @@
-from random import shuffle
+from random import shuffle, randint
 from itertools import combinations
 
 def main():
     return
+
+
+def get_subsamples_at_ratio(values, n_fold=1000, ratio=0.1):
+    n = int(round(len(values) * float(ratio)))
+    #for i in xrange(n_fold):
+    #	yield random_combination(values, n, n_fold=1)
+    return get_subsamples(values, n_fold, n)
+
 
 def get_subsamples(scores, n_fold=10000, n_sample=1000):
     for i in xrange(n_fold):
@@ -22,9 +30,12 @@ def random_combination(nodes, n, r):
     shuffle(nodes)
     values = []
     for i, combination in enumerate(combinations(nodes, n)):
-	if i >= r:
+	if randint(0, n) == 0:
+	    values.append(combination)
+	if len(values) >= r:
 	    break
-	values.append(combination)
+    if len(values) < r:
+	raise ValueError("Not enough combinations!")
     return values
 
 
@@ -53,6 +64,7 @@ def k_fold_cross_validation(X, K, randomize = False, replicable = None):
 	validation = [x for i, x in enumerate(X) if i % K == k]
 	yield k+1, training, validation
     return
+
 
 def generate_samples_from_list_without_replacement(elements, sample_size, n_folds = None, replicable = None):
     """
