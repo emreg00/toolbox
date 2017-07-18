@@ -3,8 +3,9 @@
 # drug and network analysis
 # e.g. 10/2015
 #######################################################################
-import network_utilities, parse_msigdb, stat_utilities, dict_utilities, TsvReader, functional_enrichment
-import parse_umls
+import network_utilities, stat_utilities, dict_utilities, text_utilities
+import TsvReader, functional_enrichment
+import parse_umls, parse_msigdb 
 import parse_uniprot, parse_ncbi, OBO
 import csv, numpy, os, cPickle
 from random import shuffle
@@ -534,7 +535,7 @@ def calculate_proximity_multiple(network, from_file=None, to_file=None, n_random
     """
     nodes = set(network.nodes())
     drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
-    drug_to_targets = dict((drug, nodes & targets) for drug, targets in drug_to_targets.iteritems())
+    #drug_to_targets = dict((drug, nodes & targets) for drug, targets in drug_to_targets.iteritems())
     disease_to_genes, disease_to_category = get_diseasome_genes(to_file, nodes = nodes)
     # Calculate proximity values
     print len(drug_to_targets), len(disease_to_genes)
@@ -623,6 +624,8 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 	score_command = ' -s r -n "%s" -e "%s" -o "%s" -i %d' % (node_file, network_file, output_file, n_iteration)
     elif method == 'p':
 	score_command = ' "%s" "%s" "%s" 1' % (node_file, network_file, output_file)
+    elif method == 'w':
+	score_command = ' "%s" "%s" "%s"' % (node_file, network_file, output_file)
     else:
 	raise NotImplementedError("method %s" % method) 
     if qname is None:
@@ -630,14 +633,42 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 	    if method in ["s", "r"]:
 		executable_path = "guild" # assuming accessible guild executable
 	    else:
-		executable_path = "netprop.sh" # assuming accessible bash script calling R 
+		executable_path = "netwalk.sh" # assuming R and netwalk.sh is accessible  
 	score_command = executable_path + score_command
+	print score_command
 	os.system(score_command)
     else:
 	#os.system("qsub -cwd -o out -e err -q %s -N %s -b y %s" % (qname, scoring_type, score_command))
 	#print "qsub -cwd -o out -e err -q %s -N guild_%s -b y %s" % (qname, drug, score_command)
 	print "%s" % (score_command.replace('"', ''))
     return score_command
+
+
+def guildify_multiple(network_lcc_file, from_file, to_file, output_dir, out_file, method="s", executable_path=None):
+    network = get_network(network_lcc_file, only_lcc = False) # already using LCC 
+    nodes = set(network.nodes())
+    disease_to_genes, disease_to_category = get_diseasome_genes(to_file, nodes = nodes)
+    drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
+    f = open(out_file, 'w')
+    f.write("source\ttarget\tscore\n")
+    for target, geneids in disease_to_genes.iteritems():
+	#print target, len(geneids)
+	target_mod = text_utilities.convert_to_R_string(target)
+	target_to_score = dict((gene, 1.0) for gene in geneids)
+	node_file = output_dir + "%s.n%s" % (target_mod, method) 
+	if os.path.exists(node_file):
+	    print "Skipping existing:", node_file
+	    continue
+	run_guild(target_mod, target_to_score, nodes, network_lcc_file, output_dir, executable_path, background_score = 0.01, qname = None, method = method) 
+	node_to_score = dict(line.strip("\n").split() for line in open(node_file).readlines())
+	values = map(float, numpy.array(node_to_score.values()))
+	m = numpy.mean(values)
+	s = numpy.std(values)
+	for source, geneids in drug_to_targets.iteritems():
+	    score = -numpy.mean([(float(node_to_score[gene]) - m) / s for gene in geneids])
+	    f.write("%s\t%s\t%f\n" % (source, target, score))
+    f.close()
+    return
 
 
 ### Functional enrichment related ###

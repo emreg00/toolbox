@@ -276,7 +276,7 @@ def get_background_normalized_separation_distance(network, sp, targets, seeds, d
 	bins = get_degree_binning(network, n_node_in_bins)
 	seed_to_equivalent_nodes = get_degree_equivalents(seeds, bins, network)
     # Get original score
-    d = get_separation(network, sp, targets, seeds, distance)
+    d_org = get_separation(network, sp, targets, seeds, distance)
     values = numpy.empty(n_random)
     for i in xrange(n_random):
 	nodes = []
@@ -285,12 +285,12 @@ def get_background_normalized_separation_distance(network, sp, targets, seeds, d
 	d_random = get_separation(network, sp, targets, nodes, distance = distance)
 	values[i] = d_random
     m, s = numpy.mean(values), numpy.std(values)
-    d -= m
+    d = d_org - m
     if s == 0:
 	d = 0.0
     else:
 	d /= s
-    return d
+    return d, z, (m, s)
 
 
 def get_source_to_average_target_distance_random(sp, targets, nodes, distance, target_mean_and_std, seed_to_equivalent_nodes, n_random = 100):
