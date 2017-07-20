@@ -519,7 +519,7 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
 	nodes_from, nodes_to = values_random
 	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
 	values[i] = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
-    #pval = float(sum(values <= d)) / len(values)
+    #pval = float(sum(values <= d)) / len(values) # needs high number of n_random
     m, s = numpy.mean(values), numpy.std(values)
     if s == 0:
 	z = 0.0
@@ -589,6 +589,94 @@ def get_random_nodes(nodes, network, bins=None, n_random=1000, min_bin_size=100,
 	bins = network_utilities.get_degree_binning(network, min_bin_size) 
     nodes_random = network_utilities.pick_random_nodes_matching_selected(network, bins, nodes, n_random, degree_aware, seed=seed) 
     return nodes_random
+
+
+### Separation related
+
+def calculate_separation_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None):
+    """
+    Calculate proximity from nodes_from to nodes_to
+    If degree binning or random nodes are not given, they are generated
+    lengths: precalculated shortest path length dictionary
+    """
+    nodes_network = set(network.nodes())
+    if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
+	return None # At least one of the node group not in network
+    d = get_separation(network, nodes_from, nodes_to, lengths)
+    if bins is None and (nodes_from_random is None or nodes_to_random is None):
+	bins = network_utilities.get_degree_binning(network, min_bin_size, lengths) # if lengths is given, it will only use those nodes
+    if nodes_from_random is None:
+	nodes_from_random = get_random_nodes(nodes_from, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    if nodes_to_random is None:
+	nodes_to_random = get_random_nodes(nodes_to, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
+    random_values_list = zip(nodes_from_random, nodes_to_random)
+    values = numpy.empty(len(nodes_from_random)) #n_random
+    for i, values_random in enumerate(random_values_list):
+	nodes_from, nodes_to = values_random
+	values[i] = get_separation(network, nodes_from, nodes_to, lengths)
+    m, s = numpy.mean(values), numpy.std(values)
+    if s == 0:
+	z = 0.0
+    else:
+	z = (d - m) / s
+    return d, z, (m, s) #(z, pval)
+
+
+def get_separation(network, nodes_from, nodes_to, lengths=None):
+    dAA = numpy.mean(get_separation_within_set(network, nodes_from))
+    dBB = numpy.mean(get_separation_within_set(network, nodes_to))
+    dAB = numpy.mean(get_separation_between_sets(network, nodes_from, nodes_to))
+    d = dAB - (dAA + dBB) / 2.0
+    return d
+
+
+def get_separation_between_sets(network, nodes_from, nodes_to, lengths=None):
+    """
+    Calculate dAB in separation metric proposed by Menche et al. 2015
+    """
+    values = []
+    target_to_values = {}
+    source_to_values = {}
+    for source_id in nodes_from:
+	for target_id in nodes_to:
+	    if lengths is not None:
+		d = lengths[source_id][target_id] 
+	    else:
+		d = network_utilities.get_shortest_path_length_between(network, source_id, target_id)
+	    source_to_values.setdefault(source_id, []).append(d)
+	    target_to_values.setdefault(target_id, []).append(d)
+    # Distances to closest node in nodes_to (B) from nodes_from (A)
+    for source_id in nodes_from:
+	inner_values = source_to_values[source_id]
+	values.append(numpy.min(inner_values))
+    # Distances to closest node in nodes_from (A) from nodes_to (B)
+    for target_id in nodes_to:
+	inner_values = target_to_values[target_id]
+	values.append(numpy.min(inner_values))
+    return values
+
+
+def get_separation_within_set(network, nodes_from, lengths=None):
+    """
+    Calculate dAA or dBB in separation metric proposed by Menche et al. 2015
+    """
+    if len(nodes_from) == 1:
+	return [ 0 ]
+    values = []
+    # Distance to closest node within the set (A or B)
+    for source_id in nodes_from:
+	inner_values = []
+	for target_id in nodes_from:
+	    if source_id == target_id:
+		continue
+	    if lengths is not None:
+		d = lengths[source_id][target_id] 
+	    else:
+		d = network_utilities.get_shortest_path_length_between(network, source_id, target_id)
+	    inner_values.append(d)
+	values.append(numpy.min(inner_values))
+    return values
+
 
 
 ### GUILD related ###
