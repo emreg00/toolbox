@@ -1039,23 +1039,29 @@ def pick_random_nodes_matching_selected(network, bins, nodes_selected, n_random,
 	if degree_aware:
 	    if connected:
 		raise ValueError("Not implemented!")
-	    nodes_random = []
+	    nodes_random = set()
 	    node_to_equivalent_nodes = get_degree_equivalents(nodes_selected, bins, network)
 	    for node, equivalent_nodes in node_to_equivalent_nodes.iteritems():
-		nodes_random.append(random.choice(equivalent_nodes))
+	    	#nodes_random.append(random.choice(equivalent_nodes))
+		chosen = random.choice(equivalent_nodes)
+		for k in xrange(20): # Try to find a distinct node (at most 20 times)
+		    if chosen in nodes_random:
+			chosen = random.choice(equivalent_nodes)
+	    	nodes_random.add(chosen)
+	    nodes_random = list(nodes_random)
 	else:
 	    if connected:
 		nodes_random = [ random.choice(nodes) ]
-		i = 1
+		k = 1
 		while True:
-		    if i == len(nodes_selected):
+		    if k == len(nodes_selected):
 			break
 		    node_random = random.choice(nodes_random)
 		    node_selected = random.choice(network.neighbors(node_random))
 		    if node_selected in nodes_random:
 			continue
 		    nodes_random.append(node_selected)
-		    i += 1
+		    k += 1
 	    else:
 		nodes_random = random.sample(nodes, len(nodes_selected))
 	values.append(nodes_random)
