@@ -7,6 +7,7 @@ import network_utilities, stat_utilities, dict_utilities, text_utilities
 import TsvReader, functional_enrichment
 import parse_umls, parse_msigdb 
 import parse_uniprot, parse_ncbi, OBO
+import parse_drugbank_v4, parse_medi
 import csv, numpy, os, cPickle
 from random import shuffle
 
@@ -483,6 +484,55 @@ def get_symptom_info(symptom_file, tfidf_cutoff=None):
     return disease_to_symptoms, symptom_to_diseases, disease_to_symptom_to_score
 
 
+##### Drug related info #####
+
+def get_drugbank(drugbank_file):
+    dump_file = drugbank_file + ".pcl"
+    if os.path.exists(dump_file):
+	parser = cPickle.load(open(dump_file))
+    else:
+	parser = parse_drugbank_v4.DrugBankXMLParser(drugbank_file)
+	parser.parse()
+	cPickle.dump(parser, open(dump_file, 'w'))
+    return parser
+
+
+def get_medi_indications(medi_file, drugbank_file, mesh_dump, only_hps=True):
+    dump_file = medi_file + ".pcl"
+    if os.path.exists(dump_file):
+	drug_to_diseases = cPickle.load(open(dump_file))
+	return drug_to_diseases 
+    parser = get_drugbank(drugbank_file)
+    name_to_drug, synonym_to_drug = parser.get_synonyms(selected_drugs=None, only_synonyms=False)
+    name_to_cui_and_confidences = parse_medi.get_medi_mapping(medi_file)
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(None, None, dump_file = mesh_dump)
+    drug_to_indications = parse_medi.get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_to_drug, concept_id_to_mesh_id, mesh_id_to_name, dump_file = None) 
+    drug_to_diseases = {}
+    for drug, values in drug_to_indications.iteritems():
+	for phenotype, dui, val in values:
+    	    if only_hps and val <= 0.5:
+    		continue
+	    drug_to_diseases.setdefault(drug, set()).add(phenotype)
+    # Drug name to disease name textual mapping
+    #name_to_indication_and_confidences = parse_medi.get_medi_mapping(medi_file, textual_indication=True)
+    #drug_to_diseases = {}
+    #for name, values in name_to_indication_and_confidences.iteritems():
+    #	for indication, confidence in values:
+    #	    if only_hps and confidence <= 0.5:
+    #		continue
+    #	    drug_to_diseases.setdefault(name, set()).add(indication.lower())
+    # Get disease to name mapping
+    #phenotype_to_mesh_id = dict((name, mesh_id) for mesh_id, name in mesh_id_to_name.iteritems())
+    #disease_to_drugs = parse_medi.get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id)
+    cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
+    return drug_to_diseases
+
+
+def get_hetionet_indications(hetionet_file, do_file):
+    drug_to_diseases = parse_hetionet.get_drug_disease_mapping(hetionet_file, do_file)
+    return drug_to_diseases 
+
+
 ##### Statistics related #####
 
 def overlap_significance(geneids1, geneids2, nodes):
@@ -494,6 +544,7 @@ def overlap_significance(geneids1, geneids2, nodes):
 
 
 ##### Proximity related #####
+
 def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None):
     """
     Calculate proximity from nodes_from to nodes_to
