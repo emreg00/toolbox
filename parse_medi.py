@@ -2,10 +2,12 @@ import os, cPickle, parse_drugbank
 
 
 def main():
-    name = "Mesna"
-    mapping_file = "/home/emre/arastirma/data/drug/medi/MEDI_01212013_UMLS.csv"
-    name_to_cui_and_confidences = get_medi_mapping(mapping_file)
-    print name_to_cui_and_confidences[name]
+    name = "Mesna" # Acarbose
+    #mapping_file = "/home/emre/data/indication/medi/MEDI_01212013_UMLS.csv"
+    mapping_file = "/home/emre/data/indication/medi/MEDI_01212013.csv" 
+    #name_to_cui_and_confidences = get_medi_mapping_old(mapping_file)
+    name_to_icd_and_confidences = get_medi_mapping(mapping_file)
+    print name_to_icd_and_confidences[name]
     return 
 
 
@@ -23,7 +25,47 @@ def get_disease_specific_drugs(drug_to_diseases, phenotype_to_mesh_id, cutoff=1)
     return disease_to_drugs
 
 
-def get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_to_drug, concept_id_to_mesh_id, mesh_id_to_name, dump_file):
+def get_drug_disease_mapping(name_to_icd_and_confidences, name_to_drug, synonym_to_drug, icd_to_mesh_ids, mesh_id_to_name, dump_file):
+    """
+    name_to_icd_and_confidences mapping from MEDI
+    name_to_drug & synonym mapping from DrugBank
+    icd_to_mesh_ids mapping from DO
+    mesh_id_to_name mapping from UMLS (MSH | MH)
+    """
+    if dump_file is not None and os.path.exists(dump_file):
+	drug_to_diseases = cPickle.load(open(dump_file))
+	return drug_to_diseases 
+    drug_to_diseases = {} # (mesh_term, mesh_id, association score) 
+    for name, values in name_to_icd_and_confidences.iteritems():
+	#if name != "Acarbose":
+	#    continue
+        # Get drugbank id from name in the label
+	drugbank_id, drugbank_name = parse_drugbank.get_drugbank_id_from_name(name, name_to_drug, synonym_to_drug)
+        if drugbank_id is None:
+            continue
+	#if drugbank_id != "DB00284":
+	#    continue
+	#print "%s\t%s\t%s" % (drugbank_name, drugbank_id, name)
+        for icd, val in values:
+	    icd = icd.split(".")[0]
+	    #print icd, val, icd in icd_to_mesh_ids 
+            if icd in icd_to_mesh_ids:
+                dui_list = icd_to_mesh_ids[icd]
+		#print dui_list
+		for dui in dui_list:
+		    if dui not in mesh_id_to_name:
+			continue
+		    phenotype = mesh_id_to_name[dui].lower()
+		    #print dui, phenotype
+		    drug_to_diseases.setdefault(drugbank_id, set()).add((phenotype, dui, val))
+	    #else:
+		# ICD9 ids are problematic - consider name matching
+    if dump_file is not None:
+	cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
+    return drug_to_diseases
+
+
+def get_drug_disease_mapping_from_cui(name_to_cui_and_confidences, name_to_drug, synonym_to_drug, concept_id_to_mesh_id, mesh_id_to_name, dump_file):
     """
     name_to_cui_and_confidences mapping from MEDI
     name_to_drug & synonym mapping from DrugBank
@@ -32,7 +74,7 @@ def get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_
     if dump_file is not None and os.path.exists(dump_file):
 	drug_to_diseases = cPickle.load(open(dump_file))
 	return drug_to_diseases 
-    drug_to_diseases = {} # (mesh_id, mesh_term, association score) 
+    drug_to_diseases = {} # (mesh_term, mesh_id, association score) 
     for name, values in name_to_cui_and_confidences.iteritems():
         # Get drugbank id from name in the label
 	drugbank_id, drugbank_name = parse_drugbank.get_drugbank_id_from_name(name, name_to_drug, synonym_to_drug)
@@ -51,7 +93,6 @@ def get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_
 
 
 def get_medi_mapping(mapping_file, textual_indication=False):
-    #! They removed the UMLS_CUI field, need to map ICD to MeSH
     """ 
     RXCUI_IN,DRUG_DESC,ICD9,INDICATION_DESCRIPTION,MENTIONEDBYRESOURCES,HIGHPRECISIONSUBSET,POSSIBLE_LABEL_USE
     44,Mesna,599.7,Hematuria,1,0,0
@@ -64,12 +105,12 @@ def get_medi_mapping(mapping_file, textual_indication=False):
         name = words[1]
         icd = words[2]
 	if textual_indication:
-	    cui = words[3]
+	    icd = words[3]
         in_hps = words[5]
         confidence = 0.5
         if in_hps == "1":
             confidence = 1 
-        name_to_icd_and_confidences.setdefault(name, []).append((cui, confidence))
+        name_to_icd_and_confidences.setdefault(name, []).append((icd, confidence))
     f.close()
     return name_to_icd_and_confidences
  

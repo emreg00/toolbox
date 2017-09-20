@@ -6,8 +6,9 @@
 import network_utilities, stat_utilities, dict_utilities, text_utilities
 import TsvReader, functional_enrichment
 import parse_umls, parse_msigdb 
-import parse_uniprot, parse_ncbi, OBO
-import parse_drugbank_v4, parse_medi
+import parse_uniprot, parse_ncbi
+import parse_do, parse_medic, parse_disgenet
+import parse_drugbank, parse_medi, parse_hetionet
 import csv, numpy, os, cPickle
 from random import shuffle
 
@@ -20,6 +21,7 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
     """
     f = open(file_name)
     genes = [ line.strip("\n") for line in f ]
+    f.close()
     if id_type == "symbol":
 	geneid_to_names, name_to_geneid = get_geneid_symbol_mapping(id_mapping_file)
     elif id_type == "uniprot":
@@ -63,22 +65,7 @@ def get_mesh_disease_ontology(desc_file, rel_file, dump_file = None):
 
 
 def get_medic_mesh_id_mapping(medic_file):
-    medic = OBO.OBO(medic_file, save_synonyms = True)
-    name_to_id = {}
-    id_to_mesh_ids = {}
-    for node, data in medic.g.nodes_iter(data=True):
-	name = data['n']
-	name_to_id[name] = node
-	if 's' in data:
-	    for name in data['s']:
-		name_to_id[name] = node
-	if node.startswith("MESH:D"):
-	    id_to_mesh_ids[node] = [ node[5:] ]
-	else:
-	    for node2, type2 in medic.get_term_relations(node):
-		if type2 == "is_a":
-		    if node2.startswith("MESH:D"):
-			id_to_mesh_ids.setdefault(node, []).append(node2[5:])
+    name_to_id, id_to_mesh_ids = get_medic_mesh_id_mapping(medic_file)
     return name_to_id, id_to_mesh_ids 
 
 
@@ -99,64 +86,15 @@ def get_mesh_disease_category_mapping(desc_file, rel_file, dump_file = None):
     return mesh_name_to_parents
 
 
-def get_do_mesh_id_mapping(do_file):
-    do = OBO.OBO(do_file, save_synonyms = True)
-    name_to_id = {}
-    id_to_mesh_ids = {}
-    mesh_id_to_type_to_ids = {}
-    for node, data in do.g.nodes_iter(data=True):
-	name = data['n']
-	name_to_id[name] = node
-	if 's' in data:
-	    for name in data['s']:
-		name_to_id[name] = node
-	id_types = ["OMIM", "ICD9CM", "ICD10CM"] #"MESH"
-	id_dict = {} #dict((id_type, []) for id_type in id_types) 
-	mesh_ids = []
-	for xref in data["xref"]:
-	    vals = xref.split(":")
-	    if len(vals) != 2:
-		print "Ontology format inconsistency!", vals
-		continue
-	    id_type, id_val = vals
-	    if id_type == "MESH":
-		mesh_ids.append(id_val)
-	    elif id_type in id_types:
-		id_dict.setdefault(id_type, []).append(id_val)
-	if len(mesh_ids) == 0:
-	    continue
-	id_to_mesh_ids[node] = mesh_ids
-	for mesh_id in mesh_ids:
-	    #mesh_id_to_type_to_ids[mesh_id] = id_dict
-	    d = mesh_id_to_type_to_ids.setdefault(mesh_id, {})
-	    for id_type, id_vals in id_dict.items():
-		if id_type in d:
-		    d[id_type] = list(set(id_vals + d[id_type]))
-		else:
-		    d[id_type] = id_vals
-    return name_to_id, id_to_mesh_ids, mesh_id_to_type_to_ids
-
-
 def get_icd_to_mesh_ids(disease_ontology_file, id_type="ICD9CM"):
-    """
-    id_type: ICD9CM | ICD10CM
-    """
-    name_to_id, id_to_mesh_ids, mesh_id_to_type_to_ids = get_do_mesh_id_mapping(disease_ontology_file)
-    #print mesh_id_to_type_to_ids.items()[:5] 
-    icd_to_mesh_ids = {}
-    for mesh_id, type_to_ids in mesh_id_to_type_to_ids.iteritems():
-	if id_type in type_to_ids:
-	    for val in type_to_ids[id_type]:
-		words = val.split("-")
-		if len(words) > 1:
-		    icd1 = int(words[0].split(".")[0])
-		    icd2 = int(words[1].split(".")[0])
-		    icds = map(str, range(icd1, icd2+1))
-		else:
-		    icds = [ words[0].split(".")[0] ]
-		for icd in icds:
-		    icd_to_mesh_ids.setdefault(icd, set()).add(mesh_id)
+    icd_to_mesh_ids = parse_do.get_icd_to_mesh_ids(disease_ontology_file, id_type)
     return icd_to_mesh_ids
+
+
+def get_do_to_mesh_ids(disease_ontology_file):
+    name_to_do_id, do_to_mesh_ids, mesh_id_to_type_to_ids = parse_do.get_do_mesh_id_mapping(disease_ontology_file)
+    return do_to_mesh_ids
+
 
 
 ##### Network related #####
@@ -386,16 +324,7 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
 
 
 def get_disgenet_genes(file_name):
-    disease_to_genes = {}
-    disease_to_sources = {} # not keeping sources of individual associations
-    f = open(file_name)
-    reader = csv.DictReader(filter(lambda row: row[0]!='#', f), delimiter='\t')
-    for row in reader:
-	disease = row["diseaseName"].lower()
-	sources = disease_to_sources.setdefault(disease, set())
-	sources |= set(row["sourceId"].lower().split(","))
-	disease_to_genes.setdefault(disease, set()).add(row["geneId"])
-    f.close()
+    disease_to_genes, disease_to_sources = parse_disgenet.get_disgenet_genes(file_name)
     return disease_to_genes, disease_to_sources
 
 
@@ -491,22 +420,23 @@ def get_drugbank(drugbank_file):
     if os.path.exists(dump_file):
 	parser = cPickle.load(open(dump_file))
     else:
-	parser = parse_drugbank_v4.DrugBankXMLParser(drugbank_file)
+	parser = parse_drugbank.DrugBankXMLParser(drugbank_file)
 	parser.parse()
 	cPickle.dump(parser, open(dump_file, 'w'))
     return parser
 
 
-def get_medi_indications(medi_file, drugbank_file, mesh_dump, only_hps=True):
+def get_medi_indications(medi_file, drugbank_file, mesh_dump, disease_ontology_file, only_hps=True):
     dump_file = medi_file + ".pcl"
     if os.path.exists(dump_file):
 	drug_to_diseases = cPickle.load(open(dump_file))
 	return drug_to_diseases 
     parser = get_drugbank(drugbank_file)
     name_to_drug, synonym_to_drug = parser.get_synonyms(selected_drugs=None, only_synonyms=False)
-    name_to_cui_and_confidences = parse_medi.get_medi_mapping(medi_file)
+    name_to_icd_and_confidences = parse_medi.get_medi_mapping(medi_file)
     mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(None, None, dump_file = mesh_dump)
-    drug_to_indications = parse_medi.get_drug_disease_mapping(name_to_cui_and_confidences, name_to_drug, synonym_to_drug, concept_id_to_mesh_id, mesh_id_to_name, dump_file = None) 
+    icd_to_mesh_ids = get_icd_to_mesh_ids(disease_ontology_file, id_type="ICD9CM")
+    drug_to_indications = parse_medi.get_drug_disease_mapping(name_to_icd_and_confidences, name_to_drug, synonym_to_drug, icd_to_mesh_ids, mesh_id_to_name, dump_file = None) 
     drug_to_diseases = {}
     for drug, values in drug_to_indications.iteritems():
 	for phenotype, dui, val in values:
@@ -528,8 +458,20 @@ def get_medi_indications(medi_file, drugbank_file, mesh_dump, only_hps=True):
     return drug_to_diseases
 
 
-def get_hetionet_indications(hetionet_file, do_file):
-    drug_to_diseases = parse_hetionet.get_drug_disease_mapping(hetionet_file, do_file)
+def get_hetionet_indications(hetionet_file, mesh_dump, disease_ontology_file):
+    dump_file = hetionet_file + ".pcl"
+    if os.path.exists(dump_file):
+	drug_to_diseases = cPickle.load(open(dump_file))
+	return drug_to_diseases 
+    drug_to_do_ids = parse_hetionet.get_hetionet_mapping(hetionet_file, metaedge="CtD")
+    do_to_mesh_ids = get_do_to_mesh_ids(disease_ontology_file)
+    mesh_id_to_name, concept_id_to_mesh_id, mesh_id_to_name_with_synonyms = get_mesh_id_mapping(None, None, dump_file = mesh_dump)
+    drug_to_indications = parse_hetionet.get_drug_disease_mapping(drug_to_do_ids, do_to_mesh_ids, mesh_id_to_name, dump_file = None)
+    drug_to_diseases = {}
+    for drug, values in drug_to_indications.iteritems():
+	for phenotype, dui, val in values:
+	    drug_to_diseases.setdefault(drug, set()).add(phenotype)
+    cPickle.dump(drug_to_diseases, open(dump_file, 'w'))
     return drug_to_diseases 
 
 
