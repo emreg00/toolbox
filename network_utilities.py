@@ -34,7 +34,7 @@ import os, cPickle, numpy
 try:
     from scipy.stats import rankdata
 except:
-    print "SCIPY is not installed, rank-based distance methods wont work"
+    print "scipy is not installed, rank-based distance methods wont work"
 
 try:
     from external.genrev import NWSteiner as steiner
@@ -1292,8 +1292,8 @@ def filter_network(g, degree_threshold=None, largest_connected_component=True):
 	    subgraph_nodes.append(id)
     g_filtered = g.subgraph(subgraph_nodes)
     if largest_connected_component:
-	component_nodes = networkx.connected_components(g_filtered)[0]
-	g_filtered = g_filtered.subgraph(component_nodes )
+	component_nodes = max(networkx.connected_components(g_filtered), key=len).nodes()
+	g_filtered = g_filtered.subgraph(component_nodes)
     print "V,E filtered:", g_filtered.number_of_nodes(), g_filtered.number_of_edges()
     return g_filtered
 

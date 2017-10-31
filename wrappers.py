@@ -10,7 +10,7 @@ import parse_uniprot, parse_ncbi
 import parse_do, parse_medic, parse_disgenet
 import parse_drugbank, parse_medi, parse_hetionet
 import csv, numpy, os, cPickle
-from random import shuffle
+import random
 
 ##### Id mapping related #####
 
@@ -130,16 +130,18 @@ def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_r
     # Degree matching problematic for small bin sizes
     #if bins is None and nodes_random is None:
     #	bins = network_utilities.get_degree_binning(network, min_bin_size) 
+    random.seed(seed)
     if nodes_random is None:
 	network_nodes = list(network.nodes())
 	#nodes_random = get_random_nodes(nodes, network, bins = bins, n_random = n_random, min_bin_size = min_bin_size, seed = seed)
 	nodes_random = []
 	for i in xrange(n_random):
-	    shuffle(network_nodes)
+	    random.shuffle(network_nodes)
 	    nodes_random.append(network_nodes[:len(nodes)])
     network_sub = network.subgraph(nodes)
-    component_nodes = network_utilities.get_connected_components(network_sub, False)[0]
-    d = len(component_nodes)
+    component_nodes = network_utilities.get_connected_components(network_sub, False)
+    #print component_nodes 
+    d = len(component_nodes[0])
     values = numpy.empty(len(nodes_random)) 
     for i, nodes in enumerate(nodes_random):
 	network_sub = network.subgraph(nodes)

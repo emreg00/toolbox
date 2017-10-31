@@ -55,7 +55,7 @@ def get_drug_targets(drug):
     try:
         response = get_data("target", drug)
     except urllib2.HTTPError:
-        print "No info for", disease
+        print "No info for", drug
         return []
     values = []
     for row in response["items"]:
