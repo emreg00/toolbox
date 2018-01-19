@@ -35,16 +35,25 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
 
 
 def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
+    """
+    uniprot_file = %(data_dir)s/uniprot/idmapping.tab
+    """
     uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids)
     return uniprot_to_geneid
 
 
-def get_uniprot_to_symbol(uniprot_symbol_file, uniprot_ids):
-    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_symbol_file, uniprot_ids, only_min=False)
+def get_uniprot_to_symbol(uniprot_symbol_file, uniprot_ids=None, only_min=True):
+    """
+    uniprot_file = %(data_dir)s/uniprot/idmapping.tab
+    """
+    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_symbol_file, uniprot_ids, only_min)
     return uniprot_to_geneid
 
 
 def get_geneid_symbol_mapping(mapping_file):
+    """
+    id_mapping_file = %(data_dir)s/ncbi/geneid_to_symbol.txt
+    """
     geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     return geneid_to_names, name_to_geneid
 
@@ -95,6 +104,10 @@ def get_do_to_mesh_ids(disease_ontology_file):
     name_to_do_id, do_to_mesh_ids, mesh_id_to_type_to_ids = parse_do.get_do_mesh_id_mapping(disease_ontology_file)
     return do_to_mesh_ids
 
+
+def get_homology_mapping(homologene_file, tax_id="10090"):
+    geneid_to_geneid, group_to_taxid_to_geneid = parse_ncbi.get_homology_mapping(homologene_file, tax_id, from_tax_id="9606", symbol_type="geneid")
+    return geneid_to_geneid 
 
 
 ##### Network related #####
@@ -152,7 +165,7 @@ def calculate_lcc_significance(network, nodes, nodes_random=None, bins=None, n_r
 	z = 0.0
     else:
 	z = (d - m) / s
-    return d, z, (m, s) 
+    return d, z, (m, s), values
 
 
 ##### Gene expression related #####
@@ -280,12 +293,14 @@ def get_sample_mapping(file_name, labels_case, labels_control=None):
 
 ##### Disease, pathway, comorbidity, symptom info related #####
 
-def get_pathway_info(pathway_file, prefix=None, nodes=None, max_pathway_size=None):
+def get_pathway_info(pathway_file, prefix=None, nodes=None, max_pathway_size=None, inner_delim=None):
     """
+    Assumes a tab separated file containing pathway name, link, geneids
     nodes to filter geneids that are not in the network
     prefix: kegg | reactome | biocarta
+    inner_delim: None for tab separated geneids, " " for space separated geneids
     """
-    pathway_to_geneids, geneid_to_pathways = parse_msigdb.get_msigdb_info(pathway_file, prefix)
+    pathway_to_geneids, geneid_to_pathways = parse_msigdb.get_msigdb_info(pathway_file, prefix, inner_delim=inner_delim)
     if nodes is not None or max_pathway_size is not None:
 	pathway_to_geneids_mod = {}
 	for pathway, geneids in pathway_to_geneids.iteritems():
@@ -702,6 +717,8 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 	n_repetition = 3 
 	n_iteration = 2 
 	score_command = ' -s s -n "%s" -e "%s" -o "%s" -r %d -i %d' % (node_file, network_file, output_file, n_repetition, n_iteration)
+    elif method == 'd':
+	score_command = ' -s d -n "%s" -e "%s" -o "%s"' % (node_file, network_file, output_file)
     elif method == 'r':
 	n_iteration = 50 
 	score_command = ' -s r -n "%s" -e "%s" -o "%s" -i %d' % (node_file, network_file, output_file, n_iteration)
@@ -713,7 +730,7 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 	raise NotImplementedError("method %s" % method) 
     if qname is None:
 	if executable_path is None:
-	    if method in ["s", "r"]:
+	    if method in ["s", "r", "d"]:
 		executable_path = "guild" # assuming accessible guild executable
 	    else:
 		executable_path = "netwalk.sh" # assuming R and netwalk.sh is accessible  
@@ -728,6 +745,13 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
 
 
 def guildify_multiple(network_lcc_file, from_file, to_file, output_dir, out_file, method="s", executable_path=None):
+    """
+    method: d | s | r | w | p
+    (netshort | netscore | page rank | random walk | propagation)
+    """
+    if os.path.exists(out_file):
+	node_to_score = dict(line.strip("\n").split() for line in open(out_file).readlines())
+	return node_to_score
     network = get_network(network_lcc_file, only_lcc = False) # already using LCC 
     nodes = set(network.nodes())
     disease_to_genes, disease_to_category = get_diseasome_genes(to_file, nodes = nodes)
@@ -751,7 +775,7 @@ def guildify_multiple(network_lcc_file, from_file, to_file, output_dir, out_file
 	    score = -numpy.mean([(float(node_to_score[gene]) - m) / s for gene in geneids])
 	    f.write("%s\t%s\t%f\n" % (source, target, score))
     f.close()
-    return
+    return node_to_score
 
 
 ### Functional enrichment related ###

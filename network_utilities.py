@@ -1173,6 +1173,20 @@ def create_network_from_two_column_file(network_file_in_two_column, delim = None
 	g.add_edge(id1, id2)
     return g
 
+def output_node_info(g, node_to_label, out_file, default_label="", node_to_name=None):
+    f = open(out_file, 'w')
+    f.write("Column 1\tColumn 2\n")
+    for u in g.nodes():
+	label = default_label
+	if u in node_to_label:
+	    label = node_to_label[u]
+	name = u
+	if node_to_name is not None:
+	    if u in node_to_name:
+		name = node_to_name[u]
+	f.write("%s\t%s\n" % (name, label))
+    f.close()
+
 def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", include_unconnected=True, remove_self=True):
     f = open(output_file_name, 'w')
     included_nodes = set()
@@ -1180,7 +1194,7 @@ def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", i
 	try:
 	    weight = str(g.get_edge_data(u,v)['w'])
 	except:
-	    weight = "default"
+	    weight = "1"
 	if node_to_desc is not None:
 	    desc1, desc2 = node_to_desc[u], node_to_desc[v]
 	else:
