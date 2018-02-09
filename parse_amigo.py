@@ -31,7 +31,7 @@ def get_geneid_to_localization(file_name, mapping_file):
 	    continue
 	# Store evidence type as well
 	geneid_to_localization.setdefault(geneid, set()).add((go, evidence))
-    print len(uniprots_unmatched), "Unmatched:", ", ".join(sorted(uniprots_unmatched))
+    print "Unmatched:", len(uniprots_unmatched) #, ", ".join(sorted(uniprots_unmatched))
     return geneid_to_localization
 
 

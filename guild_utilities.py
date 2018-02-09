@@ -433,7 +433,6 @@ def get_node_to_description(node_mapping_file, network_file):
     """
     network_nodes = get_nodes(network_file)
     print len(network_nodes)
-
     id_mapping = file_converter.get_id_to_mapped_id_mapping(node_mapping_file)
     node_to_desc = {}
     for node, vals in id_mapping.iteritems():

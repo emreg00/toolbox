@@ -22,32 +22,39 @@ def check_functional_enrichment_of_human_gene_symbols(file_name, out_file_name):
     check_functional_enrichment(a, None, "genesymbol", open(out_file_name, 'w').write, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format = False) 
     return
 
-def check_functional_enrichment(subset_gene_ids, gene_ids, id_type, output_method, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False, support=None, associations=None):
+def check_functional_enrichment(subset_gene_ids, gene_weights, id_type, output_method=None, species = "Homo sapiens", mode = "unordered", request_info=False, tex_format=False, support=None, associations=None):
     """
 	Check GO functional enrichment using funcassociate web service
-	gene_ids is a list of gene symbols (without whitespace) or gene ids
-	id_type
+	subset_gene_ids is a list of gene symbols (without whitespace) or gene ids
+	id_type: geneid | genesymbol | uniprotaccession | ...
+	species: Homo sapiens | Mus musculus | Rattus norvegicus | Saccharomyces cerevisiae | Caenorhabditis elegans | ...
 	support types: ['EXP', 'IC', 'IDA', 'IEA', 'IEP', 'IGC', 'IGI', 'IMP', 'IPI', 'ISA', 'ISM', 'ISO', 'ISS', 'NAS', 'RCA', 'TAS']
     """
+    reps = 2000
+    client_funcassociate = client.FuncassociateClient()
     if id_type == "geneid":
 	id_type = "entrezgene"
     elif id_type == "genesymbol":
-	id_type = "hgnc_symbol"
-    elif id_type == "uniprotaccession":
-	id_type = "uniprot_accession"
-    elif id_type == "uniprotentry":
-	id_type = "uniprot_id"
+	if species == "Homo sapiens":
+	    id_type = "hgnc_symbol"
+	elif species == "Mus musculus":
+	    id_type = "mgi_symbol"
+	else:
+	    print client_funcassociate.available_namespaces(species=[species]) 
+	    raise ValueError("Currently human and mouse symbols are supported!")
+    elif id_type == "uniprot": # "uniprotaccession"
+	#id_type = "uniprot_accession"
+	id_type = "uniprot_swissprot"
+    #elif id_type == "uniprotentry": 
+    #	id_type = "uniprot_id"
     elif id_type == "sgd":
 	id_type = "sgd_systematic"
     else:
 	raise ValueError("Unrecognized id_type: %s" % id_type)
-
-    reps = 2000
-    client_funcassociate = client.FuncassociateClient()
     response = client_funcassociate.functionate(query = subset_gene_ids,
                              species = species,
                              namespace = id_type,
-                             genespace = gene_ids,
+                             genespace = gene_weights,
                              mode = mode,
                              reps = reps,
 			     support = support,

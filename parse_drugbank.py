@@ -53,6 +53,7 @@ class DrugBankXMLParser(object):
 	self.drug_to_kegg = {}
 	self.drug_to_kegg_compound = {}
 	self.drug_to_pharmgkb = {}
+	self.drug_to_chembl = {}
 	self.drug_to_target_to_values = {} # drug - target - (type {target / enzyme / transporter / carrier}, known action, [action types])
         self.drug_to_categories = {}
         self.drug_to_atc_codes = {}
@@ -222,6 +223,8 @@ class DrugBankXMLParser(object):
 				self.drug_to_uniprot[drug_id] = elem.text
 			    elif resource == "PharmGKB":
 				self.drug_to_pharmgkb[drug_id] = elem.text
+			    elif resource == "ChEMBL":
+				self.drug_to_chembl[drug_id] = elem.text
 		elem.clear()
 		state_stack.pop()
 	root.clear()

@@ -105,8 +105,11 @@ def get_do_to_mesh_ids(disease_ontology_file):
     return do_to_mesh_ids
 
 
-def get_homology_mapping(homologene_file, tax_id="10090"):
-    geneid_to_geneid, group_to_taxid_to_geneid = parse_ncbi.get_homology_mapping(homologene_file, tax_id, from_tax_id="9606", symbol_type="geneid")
+def get_homology_mapping(homologene_file, tax_id="10090", from_tax_id="9606", symbol_type="geneid"):
+    """
+    symbol_type: geneid | symbol
+    """
+    geneid_to_geneid, group_to_taxid_to_geneid = parse_ncbi.get_homology_mapping(homologene_file, tax_id, from_tax_id=from_tax_id, symbol_type=symbol_type)
     return geneid_to_geneid 
 
 
@@ -115,9 +118,11 @@ def get_homology_mapping(homologene_file, tax_id="10090"):
 def get_network(network_file, only_lcc):
     network = network_utilities.create_network_from_sif_file(network_file, use_edge_data = False, delim = None, include_unconnected=True)
     #print len(network.nodes()), len(network.edges())
-    if only_lcc:
+    if only_lcc and not network_file.endswith(".lcc"):
+	print "Shrinking network to its LCC", len(network.nodes()), len(network.edges())
 	components = network_utilities.get_connected_components(network, False)
 	network = network_utilities.get_subgraph(network, components[0])
+	print "Final shape:", len(network.nodes()), len(network.edges())
 	#print len(network.nodes()), len(network.edges())
 	network_lcc_file = network_file + ".lcc"
 	if not os.path.exists(network_lcc_file ):
@@ -229,9 +234,11 @@ def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_typ
     #    print id_to_values[gene] 
     genes = set()
     genes_all = set()
+    genes_up, genes_down = set(), set()
     values_gene = []
     for gene, values in id_to_values.iteritems():
 	include = False
+	positive = False
 	for val in values:
 	    pval = val[header_to_idx["adj.p.val"]] # "p.value"]]
 	    if pval == "NA":
@@ -240,6 +247,8 @@ def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_typ
 	    if float(pval) <= cutoff_adj:
 		if abs(fc) >= cutoff_fc: # fc >= cutoff_fc: 
 		    include = True
+		if fc >= 0: 
+		    positive = True
 		if n_top is not None:
 		    values_gene.append((abs(fc), gene))
 	for word in gene.split("///"):
@@ -248,12 +257,16 @@ def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_typ
 		continue
 	    if include:
 		genes.add(word)
+		if positive:
+		    genes_up.add(word)
+		else:
+		    genes_down.add(word)
 	    else:
 		genes_all.add(word)
     if n_top is not None:
 	values_gene.sort()
 	genes = set([ word.strip() for fc, gene in values_gene[-n_top:] for word in gene.split("///") ])
-    return genes, genes_all
+    return genes, genes_all, genes_up, genes_down
 
 
 def get_z_genes(file_name, cutoff_z = 2):
@@ -744,20 +757,45 @@ def run_guild(phenotype, node_to_score, network_nodes, network_file, output_dir,
     return score_command
 
 
-def guildify_multiple(network_lcc_file, from_file, to_file, output_dir, out_file, method="s", executable_path=None):
+def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_file="guild.txt", method="s", executable_path=None):
     """
+    to_file: seeds
+    If from_file is not None, returns a dictionary containing average z scores of targets to source, otherwise returns empty dictionary
     method: d | s | r | w | p
     (netshort | netscore | page rank | random walk | propagation)
     """
-    if os.path.exists(out_file):
-	node_to_score = dict(line.strip("\n").split() for line in open(out_file).readlines())
-	return node_to_score
-    network = get_network(network_lcc_file, only_lcc = False) # already using LCC 
+    if from_file is not None and os.path.exists(out_file):
+	target_to_source_score = dict(line.strip("\n").split() for line in open(out_file).readlines())
+	return target_to_source_score 
+    target_to_source_score = {}
+    network = get_network(network_file, only_lcc = True) # using LCC 
+    if network_file.endswith(".lcc"):
+	network_lcc_file = network_file
+    else:
+	network_lcc_file = network_file + ".lcc"
     nodes = set(network.nodes())
     disease_to_genes, disease_to_category = get_diseasome_genes(to_file, nodes = nodes)
-    drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
-    f = open(out_file, 'w')
-    f.write("source\ttarget\tscore\n")
+    if not os.path.exists(output_dir):
+	print "Creating output directory", output_dir
+	os.makedirs(output_dir)
+    # Generate background file (for P-value calculation)
+    node_to_degree = network.degree()
+    n = max(map(len, disease_to_genes.values()))
+    values = node_to_degree.items()
+    values.sort(key=lambda x: -x[1])
+    #k = 1.0 * max(node_to_degree.values())
+    values = set(zip(*values[:n])[0])
+    f = open(output_dir + "/background.node", 'w')
+    for node, degree in node_to_degree.iteritems():
+	#score = degree/k
+	if node in values: score = 1
+	else: score = 0.01
+	f.write("%s %f\n" % (node, score))
+    f.close()
+    if from_file is not None:
+	drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
+	f = open(out_file, 'w')
+	f.write("source\ttarget\tscore\n")
     for target, geneids in disease_to_genes.iteritems():
 	#print target, len(geneids)
 	target_mod = text_utilities.convert_to_R_string(target)
@@ -768,30 +806,36 @@ def guildify_multiple(network_lcc_file, from_file, to_file, output_dir, out_file
 	    continue
 	run_guild(target_mod, target_to_score, nodes, network_lcc_file, output_dir, executable_path, background_score = 0.01, qname = None, method = method) 
 	node_to_score = dict(line.strip("\n").split() for line in open(node_file).readlines())
-	values = map(float, numpy.array(node_to_score.values()))
-	m = numpy.mean(values)
-	s = numpy.std(values)
-	for source, geneids in drug_to_targets.iteritems():
-	    score = -numpy.mean([(float(node_to_score[gene]) - m) / s for gene in geneids])
-	    f.write("%s\t%s\t%f\n" % (source, target, score))
-    f.close()
-    return node_to_score
+	if from_file is not None:
+	    values = map(float, numpy.array(node_to_score.values()))
+	    m = numpy.mean(values)
+	    s = numpy.std(values)
+	    for source, geneids in drug_to_targets.iteritems():
+		score = -numpy.mean([(float(node_to_score[gene]) - m) / s for gene in geneids])
+		f.write("%s\t%s\t%f\n" % (source, target, score))
+		d = target_to_source_score.setdefault(target, {})
+		d[source] = score
+    if from_file is not None:
+	f.close()
+    return target_to_source_score
 
 
 ### Functional enrichment related ###
 
-def check_functional_enrichment(id_list, background_id_list = None, id_type = "genesymbol", evidences = None, out_file_name = None):
+def check_functional_enrichment(id_list, background_id_weights = None, id_type = "genesymbol", species = "Homo sapiens", mode="unordered", evidences = None, out_file_name = None):
     """
-    evidences = ['EXP', 'IDA', 'IEP', 'IGI', 'IMP', 'ISA', 'ISM', 'ISO', 'ISS']
+    id_type = "geneid" # "uniprotacession" # "genesymbol"
+    evidences = ['EXP', 'IDA', 'IEP', 'IGI', 'IMP', 'ISA', 'ISM', 'ISO', 'ISS', 'IGC'] # 'IPI'
     evidences = None corresponds to ['EXP', 'IC', 'IDA', 'IEA', 'IEP', 'IGC', 'IGI', 'IMP', 'IPI', 'ISA', 'ISM', 'ISO', 'ISS', 'NAS', 'RCA', 'TAS']
     for custom associations: association = [["GO:0006509", "351"], ["GO:0048167", "348", "5663", "5664", "23621"], ["GO:0097458", "1005", "1006", "1007"], ["GO:0048487", "1", "2", "351"], ["GO:0048488", map(str, range(1000,2000))]]
+    for backgroud id weights, such as occurrence frequency: (gene, weight) 
     """
     if out_file_name is not None:
 	f_output = open(out_file_name, 'w').write
     else:
 	from sys import stdout 
 	f_output = stdout.write
-    return functional_enrichment.check_functional_enrichment(id_list, background_id_list, id_type, f_output, tex_format = False, support = evidences, associations = None) 
+    return functional_enrichment.check_functional_enrichment(id_list, background_id_weights, id_type, f_output, species = species, mode = mode, tex_format = False, support = evidences, associations = None) 
 
 
 

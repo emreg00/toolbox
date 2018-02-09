@@ -15,7 +15,7 @@ def main():
     return
 
 
-def get_geneid_to_localization(file_name, mapping_file, only_extracellular=False):
+def get_geneid_to_localization(file_name, mapping_file, only_extracellular=False, filter_uncertain=False):
     """
     Relevant extracellular term: Plasma membrane (GO:0005886)
     Some other terms: Vesicles (GO:0043231);Nuclear bodies (GO:0016604);Nucleoplasm (GO:0005654);Cytosol (GO:0005829);Nucleoli (GO:0005730);Mitochondria (GO:0005739);Cell Junctions (GO:0030054);Endoplasmic reticulum (GO:0005783);Centrosome (GO:0005813);Nucleoli fibrillar center (GO:0001650);Golgi apparatus (GO:0005794);Nuclear speckles (GO:0016607)
@@ -30,8 +30,8 @@ def get_geneid_to_localization(file_name, mapping_file, only_extracellular=False
 	words = line.strip("\n").split("\t")
 	# Evidence and reliability are for experimental characterization
 	gene, reliability, go_terms = words[1], words[2], words[-1]
-	#if reliability == "Uncertain":
-	#    continue
+	if filter_uncertain and reliability == "Uncertain":
+	    continue
 	if gene in name_to_geneid:
 	    geneid = name_to_geneid[gene]
 	else:
@@ -45,7 +45,7 @@ def get_geneid_to_localization(file_name, mapping_file, only_extracellular=False
 		continue
 	    geneid_to_localization.setdefault(geneid, set()).add((go, reliability))
     f.close()
-    print len(ids_unmatched), "Unmatched:", ", ".join(sorted(ids_unmatched))
+    print "Unmatched:", len(ids_unmatched) #, ", ".join(sorted(ids_unmatched))
     return geneid_to_localization
 
 
@@ -92,7 +92,7 @@ def get_geneid_to_predicted_localization(file_name_membrane, file_name_secreted,
 	    if localization == "secreted":
 		geneid_to_localization.setdefault(geneid, set()).add((localization, reliability))
     f.close()
-    print len(ids_unmatched), "Unmatched:", ", ".join(sorted(ids_unmatched))
+    print "Unmatched:", len(ids_unmatched) #, ", ".join(sorted(ids_unmatched))
     return geneid_to_localization
 
 

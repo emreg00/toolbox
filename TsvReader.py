@@ -154,3 +154,66 @@ class TsvReader(FormattedFileProcessor):
 	    return
 
 
+def get_from_to_mapping(file_name, from_column = None, to_column = None, delim="\t", inner_delim = None, filter_column = None, exclude_value = None, include_value = None, one_to_one=False):
+    """
+    If inner_delim is None, it assumes one to one mapping in each line (although the first id could be repeated across lines
+    Otherwise, it assumes one first id per line across whole file
+    # EXAMPLE:
+    chembl_to_uniprots = TsvReader.get_from_to_mapping(file_name, "ChemblId", "UniprotId", delim="\t", inner_delim = None, filter_column = None, exclude_value = None, include_value = None, one_to_one=False)
+    """
+    reader = TsvReader(file_name, delim=delim, inner_delim = inner_delim)
+    fields_to_include = None
+    if filter_column is not None:
+	if from_column is None or to_column is None:
+	    raise ValueError("FROM and TO columns are also required for filtering!")
+	fields_to_include = [from_column, to_column, filter_column]
+	filter_column = filter_column.lower()
+    else:
+	if from_column is not None and to_column is not None:
+	    fields_to_include = [from_column, to_column]
+	else:
+	    fields_to_include = None 
+    if to_column is not None:
+	to_column = to_column.lower()
+    merge_inner_values = False
+    if inner_delim is not None:
+	merge_inner_values = True
+    header_to_index, key_to_values = reader.read(fields_to_include = None, merge_inner_values = merge_inner_values)
+    if len(header_to_index) > 2:
+	#raise ValueError("FROM and TO columns are required for files that contain more than two columns!")
+	print "Assuming the first column as FROM and the second column as TO fields!"
+    from_to_id_mapping = {}
+    for key, values in key_to_values.iteritems():
+	#if inner_delim is not None:
+	#values = reduce(lambda x,y: x+y, values)
+	#values = values[0]
+	vals = []
+	if filter_column is not None:
+	    if exclude_value is not None or include_value is not None:
+		for val in values:
+		    if exclude_value is not None and val[header_to_index[filter_column]] == exclude_value:
+			continue
+		    if include_value is not None and val[header_to_index[filter_column]] != include_value:
+			continue
+		    vals.append(val[header_to_index[to_column]])
+	else:
+	    if to_column is not None:
+		for val in values:
+		    vals.append(val[header_to_index[to_column]])
+	    else:
+		for val in values:
+		    vals.append(val[0])
+	#if "-" in vals:
+	#    vals.remove("-")
+	#if len(vals) < 1:
+	#    continue
+	if one_to_one:
+	    if len(vals) > 1 :
+		vals.sort(key=len)
+		print "Selecting the first among shortest", vals
+	    from_to_id_mapping[key] = vals[0]
+	else:
+	    from_to_id_mapping[key] = set(vals)
+    return from_to_id_mapping
+
+

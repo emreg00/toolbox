@@ -58,12 +58,13 @@ def get_drug_targets(drug):
         print "No info for", drug
         return []
     values = []
+    values_all = []
     for row in response["items"]:
 	term = row["hasAssay"]["hasTarget"]
-	#print term
-	if term["targetOrganismName"] == "Homo sapiens":
+	#print term 
+	if "targetOrganismName" in term and term["targetOrganismName"] == "Homo sapiens":
 	    values.append(term["title"])
-    return values
+    return values, values_all
 
 
 if __name__ == "__main__":
