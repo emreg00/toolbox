@@ -194,6 +194,15 @@ def get_steiner_tree(G, terminals, sp=None):
     subgraph = steiner.NWConnSteiner(G, terminals, shortestPath=sp)
     return subgraph
 
+def get_heuristic_tree(G, terminals):
+    # d: search radius, r: the expansion factor
+    subgraph = steiner.Heuristic.listQuery(G, terminals, d=1, r=0.2) # scoreFun=Heuristic.sum_score
+    return subgraph
+
+def get_kwalk_tree(G, terminals):
+    subgraph = steiner.kWalk.limkWalks(terminals, G) #, L=50, iteration=1)
+    return subgraph
+
 @dumper
 def get_clustering_coefficient(g, dump_file):
     return networkx.clustering(g)
