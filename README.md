@@ -57,6 +57,7 @@ Parsers available for the APIs / files provided in the following resources (note
 - [Metab2Mesh](http://metab2mesh.ncibi.org)
 - [MeSH](http://www.ncbi.nlm.nih.gov/mesh)
 - [MSigDB](http://www.broadinstitute.org/msigdb)
+- [MyChem.info](http://mychem.info/)
 - [NCBI Gene](http://www.ncbi.nlm.nih.gov/gene)
 - [NDFRT API](https://rxnav.nlm.nih.gov/NdfrtAPIs.html)
 - [OpenFDA API](https://open.fda.gov)
