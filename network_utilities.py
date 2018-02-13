@@ -37,7 +37,7 @@ except:
     print "scipy is not installed, rank-based distance methods wont work"
 
 try:
-    from external.genrev import NWSteiner as steiner
+    from external.genrev import NWSteiner, Heuristic, kWalk
 except:
     print "GenRev not found, steiner wont work"
 
@@ -191,16 +191,16 @@ def get_all_paths_between(G, source_id, target_id, cutoff=None):
     return networkx.all_simple_paths(G, source_id, target_id, cutoff)
 
 def get_steiner_tree(G, terminals, sp=None):
-    subgraph = steiner.NWConnSteiner(G, terminals, shortestPath=sp)
+    subgraph = NWSteiner.NWConnSteiner(G, terminals, shortestPath=sp)
     return subgraph
 
-def get_heuristic_tree(G, terminals):
+def get_heuristic_tree(G, terminals, distance=2, score_increment=0.2):
     # d: search radius, r: the expansion factor
-    subgraph = steiner.Heuristic.listQuery(G, terminals, d=1, r=0.2) # scoreFun=Heuristic.sum_score
+    subgraph = Heuristic.listQuery(G, terminals, d=distance, r=score_increment) # d=1, r=0.2, scoreFun=Heuristic.sum_score
     return subgraph
 
 def get_kwalk_tree(G, terminals):
-    subgraph = steiner.kWalk.limkWalks(terminals, G) #, L=50, iteration=1)
+    subgraph = kWalk.limkWalks(terminals, G) #, L=50, iteration=1)
     return subgraph
 
 @dumper

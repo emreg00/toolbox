@@ -28,13 +28,18 @@ def main():
     return
 
 
-def get_uniprot_to_geneid(file_name, uniprot_ids=None, only_min=True):
+def get_uniprot_to_geneid(file_name, uniprot_ids=None, only_min=True, key_function=int):
     """
-    wget ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz
-    zcat HUMAN_9606_idmapping_selected.tab.gz | cut -f 1,3 > idmapping.tab
     To parse HUMAN_9606_idmapping.dat file (trimmed to two columns) from Uniprot 
+    only_min: Chooses the "min" defined by key_function used in min() 
+    key_function: int (geneids) | len (gene symbols)
+    Creating the file
+    wget ftp://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz
+    zgrep Gene_Name HUMAN_9606_idmapping.dat.gz | cut -f 1,3 > uniprot_to_symbol.txt
+    zgrep GeneID HUMAN_9606_idmapping.dat.gz | cut -f 1,3 > idmapping.tab
+    OR zcat HUMAN_9606_idmapping_selected.dat.gz | cut -f 1,3 > idmapping.tab
     """
-    uniprot_to_geneid = {}
+    uniprot_to_geneids = {}
     #geneid_to_uniprots = {}
     f = open(file_name)
     f.readline()
@@ -46,11 +51,17 @@ def get_uniprot_to_geneid(file_name, uniprot_ids=None, only_min=True):
 	    continue
 	if uniprot_ids is not None and uniprot not in uniprot_ids:
 	    continue
-	if only_min:
-	    geneid = str(min(map(int, geneid.split("; "))))
-	uniprot_to_geneid[uniprot] = geneid
+	#if only_min:
+	#    geneid = min(geneid.split("; "), key=key_function)
+	#uniprot_to_geneids[uniprot] = geneid
+	uniprot_to_geneids.setdefault(uniprot, set()).add(geneid)
     f.close()
-    return uniprot_to_geneid
+    if only_min:
+	uniprot_to_geneid = {}
+	for uniprot, geneids in uniprot_to_geneids.iteritems():
+	    uniprot_to_geneid[uniprot] = min(geneids, key=key_function)
+	uniprot_to_geneids = uniprot_to_geneid
+    return uniprot_to_geneids
 
 
 def get_uniprot_to_geneid_from_idmapping_file(file_name, uniprot_ids=None):

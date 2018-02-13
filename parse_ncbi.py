@@ -6,9 +6,10 @@ def main():
 
 def get_geneid_symbol_mapping(file_name):
     """
+    To parse Homo_sapiens.gene_info (trimmed to two colums) file from NCBI 
+    Creating the file
     wget ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
     zcat Homo_sapiens.gene_info.gz | cut -f 2,3 > geneid_to_symbol.txt
-    To parse Homo_sapiens.gene_info (trimmed to two colums) file from NCBI 
     """
     f = open(file_name)
     f.readline()
@@ -24,7 +25,7 @@ def get_geneid_symbol_mapping(file_name):
 	if symbol in name_to_geneid: 
 	    if int(geneid) >= int(name_to_geneid[symbol]):
 		continue
-	    print name_to_geneid[symbol], geneid, symbol
+	    print "Multiple geneids", name_to_geneid[symbol], geneid, symbol
 	name_to_geneid[symbol] = geneid
     f.close()
     return geneid_to_names, name_to_geneid

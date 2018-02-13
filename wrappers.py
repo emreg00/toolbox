@@ -19,13 +19,11 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
     Expects a file where each line is a gene name / uniprot id
     id_type: symbol | uniprot
     """
-    f = open(file_name)
-    genes = [ line.strip("\n") for line in f ]
-    f.close()
+    genes = [ line.strip("\n") for line in open(file_name) ]
     if id_type == "symbol":
 	geneid_to_names, name_to_geneid = get_geneid_symbol_mapping(id_mapping_file)
     elif id_type == "uniprot":
-	name_to_geneid = get_uniprot_to_geneid(id_mapping_file, uniprot_ids=None)
+	name_to_geneid = get_uniprot_to_id(id_mapping_file, uniprot_ids=genes, only_min=True, key_function=int)
     else:
 	raise ValueError("Uknown id type!")
     geneids = set([ name_to_geneid[gene] for gene in genes if gene in name_to_geneid ])
@@ -34,20 +32,12 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
     return geneids
 
 
-def get_uniprot_to_geneid(uniprot_file, uniprot_ids):
+def get_uniprot_to_id(uniprot_file, uniprot_ids=None, only_min=True, key_function=int):
     """
-    uniprot_file = %(data_dir)s/uniprot/idmapping.tab
+    uniprot_file = %(data_dir)s/uniprot/idmapping.tab or idmapping.tab.symbol or idmapping.tab.mouse
     """
-    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids)
-    return uniprot_to_geneid
-
-
-def get_uniprot_to_symbol(uniprot_symbol_file, uniprot_ids=None, only_min=True):
-    """
-    uniprot_file = %(data_dir)s/uniprot/idmapping.tab
-    """
-    uniprot_to_geneid = parse_uniprot.get_uniprot_to_geneid(uniprot_symbol_file, uniprot_ids, only_min)
-    return uniprot_to_geneid
+    uniprot_to_gene = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids, only_min, key_function)
+    return uniprot_to_gene
 
 
 def get_geneid_symbol_mapping(mapping_file):

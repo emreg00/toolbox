@@ -209,6 +209,10 @@ def get_from_to_mapping(file_name, from_column = None, to_column = None, delim="
 	#    continue
 	if one_to_one:
 	    if len(vals) > 1 :
+		vals = set(vals)
+		if "-" in vals and len(vals) > 1:
+		    vals.remove("-")
+		vals = list(vals)
 		vals.sort(key=len)
 		print "Selecting the first among shortest", vals
 	    from_to_id_mapping[key] = vals[0]
