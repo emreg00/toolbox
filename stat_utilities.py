@@ -190,7 +190,7 @@ def rank(a):
 
 
 def combine_pvalues(pvalues):
-    stat, pval = scipy.stats.combine_pvalues(pvalues, method='fisher', weights=None)
+    stat, pval = stats.combine_pvalues(pvalues, method='fisher', weights=None)
     return pval
 
 
