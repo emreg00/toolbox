@@ -178,12 +178,20 @@ def density_estimation(occurences, possible_values):
 
 
 def fisher_exact(tp, fp, fn, tn, alternative="two-sided"):
+    """
+    alternative: two-sided | greater | less 
+    """
     oddsratio, pvalue = stats.fisher_exact([[tp, fp], [fn, tn]], alternative)
     return oddsratio, pvalue
 
 
 def rank(a):
     return stats.rankdata(a)
+
+
+def combine_pvalues(pvalues):
+    stat, pval = scipy.stats.combine_pvalues(pvalues, method='fisher', weights=None)
+    return pval
 
 
 def ksrepo_score(golds, candidates):
@@ -217,6 +225,8 @@ def ks_score(golds, candidates, N=None):
     Given a ranked golds set (genes / pathways), 
     calculates KS score as proposed by Mootha et al.
     for the candidate list
+    (~max difference between cumulative distributions 
+    of the sample and expected random walk)
     """
     candidates = set(candidates)
     score = 0
@@ -238,7 +248,7 @@ def ks_score(golds, candidates, N=None):
 	if max_score is None:
 	    max_score = score
 	else:
-	    if score > max_score:
+	    if abs(score) > abs(max_score):
 		max_score = score
     return max_score
 

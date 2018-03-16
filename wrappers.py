@@ -11,6 +11,10 @@ import parse_do, parse_medic, parse_disgenet
 import parse_drugbank, parse_medi, parse_hetionet
 import csv, numpy, os, cPickle
 import random
+try:
+    from toolbox.external.diamond import diamond
+except:
+    print "DIAMOnD not found and thus will not be available!"
 
 ##### Id mapping related #####
 
@@ -497,11 +501,19 @@ def get_hetionet_indications(hetionet_file, mesh_dump, disease_ontology_file):
 
 ##### Statistics related #####
 
-def overlap_significance(geneids1, geneids2, nodes):
+def overlap_significance(geneids1, geneids2, nodes, method="hyper"):
+    """
+    method: hyper(geometric) | fishers (two-sided version of hypergeometric)
+    """
     n1, n2 = len(geneids1), len(geneids2)
     n = len(geneids1 & geneids2)
     N = len(nodes)
-    pval = stat_utilities.hypergeometric_test_numeric(n, n1, N, n2)
+    if method == "hyper":
+	pval = stat_utilities.hypergeometric_test_numeric(n, n1, N, n2)
+    elif method == "fishers":
+	oddsratio, pval = stat_utilities.fisher_exact(n, n1 - n, n2 -n, N - n1 - n2 + n, alternative="two-sided")
+    else:
+	raise ValueError("Uknown method: %s" % method)
     return n, n1, n2, pval
 
 
@@ -769,19 +781,20 @@ def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_fil
 	print "Creating output directory", output_dir
 	os.makedirs(output_dir)
     # Generate background file (for P-value calculation)
-    node_to_degree = network.degree()
-    n = max(map(len, disease_to_genes.values()))
-    values = node_to_degree.items()
-    values.sort(key=lambda x: -x[1])
-    #k = 1.0 * max(node_to_degree.values())
-    values = set(zip(*values[:n])[0])
-    f = open(output_dir + "/background.node", 'w')
-    for node, degree in node_to_degree.iteritems():
-	#score = degree/k
-	if node in values: score = 1
-	else: score = 0.01
-	f.write("%s %f\n" % (node, score))
-    f.close()
+    if not os.path.exists(output_dir + "/background.node"):
+	node_to_degree = network.degree()
+	n = max(map(len, disease_to_genes.values()))
+	values = node_to_degree.items()
+	values.sort(key=lambda x: -x[1])
+	#k = 1.0 * max(node_to_degree.values())
+	values = set(zip(*values[:n])[0])
+	f = open(output_dir + "/background.node", 'w')
+	for node, degree in node_to_degree.iteritems():
+	    #score = degree/k
+	    if node in values: score = 1
+	    else: score = 0.01
+	    f.write("%s %f\n" % (node, score))
+	f.close()
     if from_file is not None:
 	drug_to_targets, drug_to_category = get_diseasome_genes(from_file, nodes = nodes)
 	f = open(out_file, 'w')
@@ -794,7 +807,7 @@ def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_fil
 	if os.path.exists(node_file):
 	    print "Skipping existing:", node_file
 	    continue
-	run_guild(target_mod, target_to_score, nodes, network_lcc_file, output_dir, executable_path, background_score = 0.01, qname = None, method = method) 
+	run_guild(target_mod, target_to_score, nodes, network_lcc_file, output_dir, executable_path, background_score = 0.01, qname = "print", method = method) #!
 	node_to_score = dict(line.strip("\n").split() for line in open(node_file).readlines())
 	if from_file is not None:
 	    values = map(float, numpy.array(node_to_score.values()))
@@ -808,6 +821,40 @@ def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_fil
     if from_file is not None:
 	f.close()
     return target_to_source_score
+
+
+### DIAMOnD related ###
+
+def get_diamond_genes(network_file, seeds, file_name, only_lcc=True):
+    network = get_network(network_file, only_lcc=only_lcc) 
+    nodes = set(network.nodes())
+    seeds = set(seeds) & nodes
+    #print len(seeds)
+    n_iteration = 500
+    if not os.path.exists(file_name):
+	diamond.DIAMOnD(network, seeds, n_iteration, alpha = 1, outfile = file_name)
+    f = open(file_name)
+    f.readline()
+    genes = []
+    for line in f:
+	rank, geneid = line.strip("\n").split()
+	genes.append(geneid)
+    f.close()
+    if not os.path.exists(file_name + ".coverage"):
+	f_out = open(file_name + ".coverage", 'w')
+	n = float(len(seeds))
+	component = network.subgraph(seeds)
+	#component = max(networkx.connected_components(component), key=len)
+	components = max(network_utilities.get_connected_components(network, False), key=len)
+	f_out.write("%s %f\n" % ("0", len(component & seeds)/n))
+	for i, gene in enumerate(genes):
+	    rank = i + 1
+	    component = network.subgraph(genes[:rank] + list(seeds))
+	    #component = max(networkx.connected_components(component), key=len)
+	    components = max(network_utilities.get_connected_components(network, False), key=len)
+	    f_out.write("%s %f\n" % (rank, len(component & seeds)/n))
+	f_out.close()
+    return genes, nodes
 
 
 ### Functional enrichment related ###
