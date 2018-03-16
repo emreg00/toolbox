@@ -39,6 +39,7 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
 def get_uniprot_to_id(uniprot_file, uniprot_ids=None, only_min=True, key_function=int):
     """
     uniprot_file = %(data_dir)s/uniprot/idmapping.tab or idmapping.tab.symbol or idmapping.tab.mouse
+    Can be used to convert to geneids (key_function=int) as well as symbols (key_function=len) depending on the input file
     """
     uniprot_to_gene = parse_uniprot.get_uniprot_to_geneid(uniprot_file, uniprot_ids, only_min, key_function)
     return uniprot_to_gene

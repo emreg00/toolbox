@@ -994,7 +994,7 @@ def get_center_of_subnetwork(sp, nodes):
 
 def get_degree_binning(g, bin_size, lengths=None):
     degree_to_nodes = {}
-    for node, degree in g.degree().iteritems():
+    for node, degree in g.degree(): #.iteritems(): # iterator in networkx 2.0
 	if lengths is not None and node not in lengths:
 	    continue
 	degree_to_nodes.setdefault(degree, []).append(node)
@@ -1014,7 +1014,7 @@ def get_degree_binning(g, bin_size, lengths=None):
 	    i -= 1
 	high = values[i]
 	i += 1 
-	#print low, high, len(val)
+	#print i, low, high, len(val) 
 	if len(val) < bin_size:
 	    low_, high_, val_ = bins[-1]
 	    bins[-1] = (low_, high, val_ + val)

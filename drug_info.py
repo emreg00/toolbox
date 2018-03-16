@@ -46,9 +46,9 @@ def get_drug_targets(parameters, parser=None, id_type="geneid"):
     if id_type == "uniprot":
 	drug_to_targets = drug_to_uniprots
     elif id_type == "geneid":
-	uniprot_to_id = wrappers.get_uniprot_to_geneid(parameters.get("uniprot_file"), uniprot_ids)
+	uniprot_to_id = wrappers.get_uniprot_to_id(parameters.get("uniprot_file"), uniprot_ids, only_min=True, key_function=int)
     elif id_type == "symbol":
-	uniprot_to_id = wrappers.get_uniprot_to_symbol(parameters.get("uniprot_symbol_file"), uniprot_ids)
+	uniprot_to_id = wrappers.get_uniprot_to_id(parameters.get("uniprot_symbol_file"), uniprot_ids, only_min=True, key_function=len)
     else:
 	raise ValueError("Unknown id type: %s" % id_type)
     drug_to_targets = {}
