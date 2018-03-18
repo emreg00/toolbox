@@ -18,10 +18,10 @@ def main():
 	network_file = None 
 	n_random = None
 	min_bin_size = None
-	seed = None
+	n_seed = None
 	out_file = None
 	arguments = open(args.parameter_file).read().split()
-	print arguments
+	#print arguments
 	i = 0
 	if arguments[0] == "":
 	    i = 1
@@ -48,7 +48,7 @@ def main():
 	network_file = args.network_file
 	n_random = args.n_random
 	min_bin_size = args.min_bin_size
-	seed = args.n_seed
+	n_seed = args.n_seed
 	out_file = args.out_file
     network = network_utilities.create_network_from_sif_file(network_file, use_edge_data = False, delim = None, include_unconnected=True)
     #print args
