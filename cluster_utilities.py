@@ -64,8 +64,8 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 		    experiment_count = get_number_of_jobs_in_queues()
 		#print score_command
 		#os.system("qsub -cwd -S /bin/bash -o out -e err -v PATH=$PATH -v PYTHONPATH=$PYTHONPATH -q %s -N %s_%s -b y %s" % (qname, source[:3], target[:3], score_command))
-		#os.system("sbatch run_array.sh -f ../data/input/%i.txt" % i)
-		os.system("sbatch run_proximity.sh %s" % score_command)  
+		#os.system("sbatch -x node30 run_array.sh -f ../data/input/%i.txt" % i)
+		os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
 		i += 1
 	    else:
 		raise ValueError("Unknown run_mode: %s" % run_mode)
