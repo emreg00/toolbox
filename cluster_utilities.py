@@ -33,12 +33,12 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 	    while experiment_count > 60: 
 		sleep(delay)
 		experiment_count = get_number_of_jobs_in_queues()
-		input_file = parameters.get("data_dir") + "/input/"
-		if not os.path.exists(input_file):
-		    continue
-		score_command = "-p %s/input/ -i %d -j %d" % (parameters.get("data_dir"), i, i + 1000)
-		os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
-		i += 1000
+	    input_file = parameters.get("data_dir") + "/input/"
+	    if not os.path.exists(input_file):
+		continue
+	    score_command = "-p %s/input/ -i %d -j %d" % (parameters.get("data_dir"), i, i + 1000)
+	    os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
+	    i += 1000
 	return
     for source, geneids_source in source_to_geneids.iteritems(): 
 	#print source, len(geneids_source)
