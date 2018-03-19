@@ -27,6 +27,7 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
     md5_to_sources = {}
     n_start, n_end = 0, 700000 #15000 638952 
     if run_mode == "run cluster":
+	i = n_start
 	while i < n_end+1:
 	    experiment_count = get_number_of_jobs_in_queues()
 	    while experiment_count > 60: 
