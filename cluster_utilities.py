@@ -25,7 +25,20 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
     values = []
     source_to_md5 = {}
     md5_to_sources = {}
-    i = 0
+    n_start, n_end = 0, 700000 #15000 638952 
+    if run_mode == "run cluster":
+	while i < n_end+1:
+	    experiment_count = get_number_of_jobs_in_queues()
+	    while experiment_count > 60: 
+		sleep(delay)
+		experiment_count = get_number_of_jobs_in_queues()
+		input_file = parameters.get("data_dir") + "/input/"
+		if not os.path.exists(input_file):
+		    continue
+		score_command = "-p %s/input/ -i %d -j %d" % (parameters.get("data_dir"), i, i + 1000)
+		os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
+		i += 1000
+	return
     for source, geneids_source in source_to_geneids.iteritems(): 
 	#print source, len(geneids_source)
 	#! source = text_utilities.convert_to_R_string(source)
@@ -64,9 +77,8 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 		    experiment_count = get_number_of_jobs_in_queues()
 		#print score_command
 		#os.system("qsub -cwd -S /bin/bash -o out -e err -v PATH=$PATH -v PYTHONPATH=$PYTHONPATH -q %s -N %s_%s -b y %s" % (qname, source[:3], target[:3], score_command))
-		#os.system("sbatch -x node30 run_array.sh -f ../data/input/%i.txt" % i)
+		#os.system("sbatch -x node30 run_proximity.sh -f ../data/input/%i.txt" % i)
 		os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
-		i += 1
 	    else:
 		raise ValueError("Unknown run_mode: %s" % run_mode)
     n = 0
