@@ -530,7 +530,9 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
     nodes_network = set(network.nodes())
-    if len(set(nodes_from) & nodes_network) == 0 or len(set(nodes_to) & nodes_network) == 0:
+    nodes_from = set(nodes_from) & nodes_network 
+    nodes_to = set(nodes_to) & nodes_network
+    if len(nodes_from) == 0 or len(nodes_to) == 0:
 	return None # At least one of the node group not in network
     d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     if bins is None and (nodes_from_random is None or nodes_to_random is None):
