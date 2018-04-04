@@ -6,7 +6,7 @@ import os, numpy, cPickle
 import hashlib
 
 
-def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, run_mode='array job'):
+def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, run_mode='array job', convert_names=True):
     """
     run_mode: array job | single job | run local | run cluster
     """
@@ -26,6 +26,7 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
     source_to_md5 = {}
     md5_to_sources = {}
     n_start, n_end = 0, 700000 #15000 638952 
+    increment = 1 # 500
     if run_mode == "run cluster":
 	i = n_start
 	while i < n_end+1:
@@ -36,13 +37,17 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 	    input_file = parameters.get("data_dir") + "/input/"
 	    if not os.path.exists(input_file):
 		continue
-	    score_command = "-p %s/input/ -i %d -j %d" % (parameters.get("data_dir"), i, i + 1000)
+	    out_file = [ word for word in open(input_file).readline().strip("\n").split() if word.endswith(".out") ][0]
+	    if os.path.exists(out_file):
+		continue
+	    score_command = "-p %s/input/ -i %d -j %d" % (parameters.get("data_dir"), i, i + increment)
 	    os.system("sbatch -x node30 run_proximity.sh %s" % score_command)  
-	    i += 1000
+	    i += increment
 	return
     for source, geneids_source in source_to_geneids.iteritems(): 
 	#print source, len(geneids_source)
-	#! source = text_utilities.convert_to_R_string(source)
+	if convert_names:
+	    source = text_utilities.convert_to_R_string(source)
 	md5 = hashlib.md5("-".join(sorted(geneids_source))).hexdigest()
 	source_to_md5[source] = (md5, geneids_source)
 	if md5 in md5_to_sources:
@@ -53,7 +58,8 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 	source = md5
 	for target, geneids_target in target_to_geneids.iteritems():
 	    #print target, len(geneids_target)
-	    #! target = text_utilities.convert_to_R_string(target)
+	    if convert_names:
+		target = text_utilities.convert_to_R_string(target)
 	    out_file = parameters.get("output_dir") + "/%s_%s.out" % (source, target) 
 	    if cluster_dir is not None:
 		out_file = out_file.replace(parameters.get("base_dir"), cluster_dir) 
@@ -152,7 +158,7 @@ def output_proximity_results(parameters, sources, targets, out_file, source_to_t
     return
 
 
-def get_proximity_values(parameters, sources, targets, dump_file=None):
+def get_proximity_values(parameters, sources, targets, dump_file=None, convert_names=True):
     if dump_file is None:
 	dump_file = parameters.get("proximity_file")  
     if os.path.exists(dump_file):
@@ -168,12 +174,16 @@ def get_proximity_values(parameters, sources, targets, dump_file=None):
     f = open(dump_file + ".txt", 'w')
     f.write("source\ttarget\tz\td\n")
     for source in sources: 
-	source_mod = text_utilities.convert_to_R_string(source) 
+	source_mod = source
+	if convert_names:
+	    source_mod = text_utilities.convert_to_R_string(source) 
 	source_to_target_to_proximity[source] = {}
 	source_to_target_to_d[source] = {}
 	for target in targets:
-	    target_mod = text_utilities.convert_to_R_string(target)
-	    #target_mod = target_mod.lower() 
+	    target_mod = target
+	    if convert_names:
+		target_mod = text_utilities.convert_to_R_string(target)
+		#target_mod = target_mod.lower() 
 	    out_file = parameters.get("output_dir") + "/%s_%s.out" % (source_mod, target_mod) 
 	    if not os.path.exists(out_file):
 		print "File not found:", out_file
