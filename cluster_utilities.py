@@ -6,7 +6,7 @@ import os, numpy, cPickle
 import hashlib
 
 
-def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, run_mode='array job', convert_names=True):
+def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, run_mode='array job', convert_names=True, md5_conversion=False, n_start = 0, n_end = 640000):
     """
     run_mode: array job | single job | run local | run cluster
     """
@@ -25,7 +25,7 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
     values = []
     source_to_md5 = {}
     md5_to_sources = {}
-    n_start, n_end = 500000, 640000 #15000 638952 
+    #n_start, n_end = 500000, 640000 #15000 638952 
     increment = 500
     if run_mode == "run cluster":
 	i = n_start
@@ -48,14 +48,15 @@ def run_proximity_on_cluster(parameters, source_to_geneids, target_to_geneids, r
 	#print source, len(geneids_source)
 	if convert_names:
 	    source = text_utilities.convert_to_R_string(source)
-	md5 = hashlib.md5("-".join(sorted(geneids_source))).hexdigest()
-	source_to_md5[source] = (md5, geneids_source)
-	if md5 in md5_to_sources:
-	    md5_to_sources.setdefault(md5, set()).add(source)
-	    continue
-	else:
-	    md5_to_sources.setdefault(md5, set()).add(source)
-	source = md5
+	if md5_conversion:
+	    md5 = hashlib.md5("-".join(sorted(geneids_source))).hexdigest()
+	    source_to_md5[source] = (md5, geneids_source)
+	    if md5 in md5_to_sources:
+		md5_to_sources.setdefault(md5, set()).add(source)
+		continue
+	    else:
+		md5_to_sources.setdefault(md5, set()).add(source)
+	    source = md5
 	for target, geneids_target in target_to_geneids.iteritems():
 	    #print target, len(geneids_target)
 	    if convert_names:
@@ -158,7 +159,7 @@ def output_proximity_results(parameters, sources, targets, out_file, source_to_t
     return
 
 
-def get_proximity_values(parameters, sources, targets, dump_file=None, convert_names=True):
+def get_proximity_values(parameters, source_to_geneids, target_to_geneids, dump_file=None, convert_names=True, md5_conversion=False):
     if dump_file is None:
 	dump_file = parameters.get("proximity_file")  
     if os.path.exists(dump_file):
@@ -173,13 +174,16 @@ def get_proximity_values(parameters, sources, targets, dump_file=None, convert_n
     source_to_target_to_d = {} 
     f = open(dump_file + ".txt", 'w')
     f.write("source\ttarget\tz\td\n")
-    for source in sources: 
+    for source, geneids_source in source_to_geneids.iteritems(): 
 	source_mod = source
 	if convert_names:
 	    source_mod = text_utilities.convert_to_R_string(source) 
+	if md5_conversion:
+	    md5 = hashlib.md5("-".join(sorted(geneids_source))).hexdigest()
+	    source_mod = md5
 	source_to_target_to_proximity[source] = {}
 	source_to_target_to_d[source] = {}
-	for target in targets:
+	for target in target_to_geneids:
 	    target_mod = target
 	    if convert_names:
 		target_mod = text_utilities.convert_to_R_string(target)
