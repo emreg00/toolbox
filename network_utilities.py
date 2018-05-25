@@ -1199,7 +1199,7 @@ def output_node_info(g, node_to_label, out_file, default_label="", node_to_name=
 def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", include_unconnected=True, remove_self=True):
     f = open(output_file_name, 'w')
     included_nodes = set()
-    for u,v in g.edges_iter():
+    for u,v in g.edges():
 	try:
 	    weight = str(g.get_edge_data(u,v)['w'])
 	except:
@@ -1392,7 +1392,7 @@ def get_nodes_and_edges_from_sif_file(file_name, store_edge_type = False, delim=
 
 def get_jaccard_index_map(g):
     edge_to_jaccard = {}
-    for u,v in g.edges_iter():
+    for u,v in g.edges():
 	u_neighbors = set(g.neighbors(u))
 	v_neighbors = set(g.neighbors(v))
 	edge_to_jaccard[(u,v)] = float(len(u_neighbors & v_neighbors)) / len(u_neighbors | v_neighbors)
@@ -2061,7 +2061,7 @@ def create_dot_network_file(g, output_file, seeds=set(), node_to_desc = dict(), 
 		f.write("%s [label=\"%s\" fixedsize=true height=0.05 width=0.05 shape=rect];\n" % (node, "")) # node_to_desc[node]
 	ignored = set()
 
-    for u,v in g.edges_iter():
+    for u,v in g.edges():
 	if u in ignored or v in ignored:
 	    continue
 	if u == v: # skip self edges

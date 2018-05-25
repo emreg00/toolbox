@@ -791,7 +791,7 @@ def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_fil
 	os.makedirs(output_dir)
     # Generate background file (for P-value calculation)
     if not os.path.exists(output_dir + "/background.node"):
-	node_to_degree = network.degree()
+	node_to_degree = dict(network.degree())
 	n = max(map(len, disease_to_genes.values()))
 	values = node_to_degree.items()
 	values.sort(key=lambda x: -x[1])
