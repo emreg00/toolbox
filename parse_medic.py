@@ -10,7 +10,7 @@ def get_medic_mesh_id_mapping(medic_file):
     medic = OBO.OBO(medic_file, save_synonyms = True)
     name_to_id = {}
     id_to_mesh_ids = {}
-    for node, data in medic.g.nodes_iter(data=True):
+    for node, data in medic.g.nodes(data=True):
 	name = data['n']
 	name_to_id[name] = node
 	if 's' in data:

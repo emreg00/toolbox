@@ -1215,7 +1215,7 @@ def output_network_in_sif(g, output_file_name, node_to_desc=None, delim = " ", i
 	included_nodes.add(desc1)
 	included_nodes.add(desc2)
     if include_unconnected:
-	for u in g.nodes_iter():
+	for u in g.nodes():
 	    if node_to_desc is not None:
 		desc = node_to_desc[u]
 	    else:
@@ -1957,7 +1957,7 @@ def create_ARFF_network_metrics_file(g, node_to_score, seeds, arff_file_name, ca
 
     f = open(arff_file_name, 'w')
     f.write(header)
-    for v in g.nodes_iter():
+    for v in g.nodes():
 	d, ld, d2, ld2 = node_to_values[v]
 	if calculate_topological_values:
 	    cc = mapC[v]
