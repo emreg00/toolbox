@@ -29,7 +29,7 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
     elif id_type == "uniprot":
 	name_to_geneid = get_uniprot_to_id(id_mapping_file, uniprot_ids=genes, only_min=True, key_function=int)
     else:
-	raise ValueError("Uknown id type!")
+	raise ValueError("Uknown id type: %s" % id_type)
     geneids = set([ name_to_geneid[gene] for gene in genes if gene in name_to_geneid ])
     genes_non = set([ gene for gene in genes if gene not in name_to_geneid ])
     print genes_non
@@ -504,18 +504,24 @@ def get_hetionet_indications(hetionet_file, mesh_dump, disease_ontology_file):
 
 def overlap_significance(geneids1, geneids2, nodes, method="hyper"):
     """
-    method: hyper(geometric) | fishers (two-sided version of hypergeometric)
+    method: hyper(geometric) | fishers (two-sided version of hypergeometric) | jaccard | jaccard_max | overlap
     """
     n1, n2 = len(geneids1), len(geneids2)
     n = len(geneids1 & geneids2)
     N = len(nodes)
     if method == "hyper":
-	pval = stat_utilities.hypergeometric_test_numeric(n, n1, N, n2)
+	val = stat_utilities.hypergeometric_test_numeric(n, n1, N, n2)
     elif method == "fishers":
-	oddsratio, pval = stat_utilities.fisher_exact(n, n1 - n, n2 -n, N - n1 - n2 + n, alternative="two-sided")
+	oddsratio, val = stat_utilities.fisher_exact(n, n1 - n, n2 -n, N - n1 - n2 + n, alternative="two-sided")
+    elif method == "jaccard":
+	val = stat_utilities.jaccard(geneids1, geneids2)
+    elif method == "jaccard_max":
+	val = stat_utilities.jaccard_max(geneids1, geneids2)
+    elif method == "overlap":
+	val = n
     else:
 	raise ValueError("Uknown method: %s" % method)
-    return n, n1, n2, pval
+    return n, n1, n2, val
 
 
 ##### Proximity related #####

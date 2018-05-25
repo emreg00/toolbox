@@ -33,7 +33,7 @@ def get_do_mesh_id_mapping(do_file):
     name_to_id = {}
     id_to_mesh_ids = {}
     mesh_id_to_type_to_ids = {}
-    for node, data in do.g.nodes_iter(data=True):
+    for node, data in do.g.nodes(data=True):
 	name = data['n']
 	name_to_id[name] = node
 	if 's' in data:

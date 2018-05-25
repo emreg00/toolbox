@@ -102,7 +102,11 @@ def correlation(x, y, cor_type="pearson"):
 
 
 def jaccard(x, y):
-    return len(x & y) / len(x | y)
+    return 1.0 * len(x & y) / len(x | y)
+
+
+def jaccard_max(x, y):
+    return 1.0 * len(x & y) / max(map(len, [x, y]))
 
 
 def jaccard_signed(x_up, x_down, y_up, y_down, costs = [1, 1, 1, 1,]):

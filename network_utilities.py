@@ -48,7 +48,7 @@ FINITE_INFINITY = 999999
 
 def main():
     g = create_network_from_sif_file("interactions.sif")
-    degrees = g.degree()
+    degrees = dict(g.degree())
     node_to_values = get_node_degree_related_values(g, ["v2","v3"])
     for v in g.nodes():
 	print v, degrees[v], node_to_values[v]
@@ -1118,7 +1118,7 @@ def get_path_network(G, listNodes, path_length_cutoff=10000):
             if sp:
                 if (len(sp)-1)<=path_length_cutoff:
                     if len(set(listNodes).intersection(set(sp[1:-1])))==0:
-                        new_graph.add_edge(listNodes[x],listNodes[y],len(sp)-1)
+                        new_graph.add_edge(listNodes[x],listNodes[y]) #,len(sp)-1)
             
     return new_graph
 
@@ -1170,7 +1170,7 @@ def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, del
     if use_edge_data:
 	for e,w in dictEdge.iteritems():
 	    u,v = e
-	    g.add_edge(u,v,{'w':w})
+	    g.add_edge(u,v,w=w) #,{'w':w})
     else:
 	g.add_edges_from(setEdge)
     return g
@@ -1235,7 +1235,7 @@ def analyze_network(g, out_file = None, seeds = None, calculate_radius = False):
     # print networkx.info(g) # currently buggy but fixed in the next version of networkx
     out_method("(V,E): %d %d\n" % (g.number_of_nodes(), g.number_of_edges()))
     out_method("V/E: %f\n" % (int(g.number_of_nodes()) / float(g.number_of_edges())))
-    degrees = g.degree().values()
+    degrees = zip(*list(g.degree()))[1]
     degrees.sort()
     out_method("Average degree: %f\n" % float(sum(degrees)/float(len(degrees))))
     out_method("Most connected 20 nodes: %s\n" % degrees[-20:])
@@ -1310,9 +1310,9 @@ def filter_network(g, degree_threshold=None, largest_connected_component=True):
     print "V,E:", g.number_of_nodes(), g.number_of_edges()
     degrees = g.degree()
     subgraph_nodes = []
-    for id, d in degrees.iteritems():
+    for u, d in degrees: 
 	if degree_threshold is None or d <= degree_threshold:
-	    subgraph_nodes.append(id)
+	    subgraph_nodes.append(u)
     g_filtered = g.subgraph(subgraph_nodes)
     if largest_connected_component:
 	component_nodes = max(networkx.connected_components(g_filtered), key=len).nodes()
@@ -1481,7 +1481,7 @@ def randomize_graph(graph, randomization_type, allow_self_edges = False):
 	    new_graph = networkx.create_empty_copy(graph) 
 
 	available_edges = graph.edges() 
-	degree_map = networkx.degree(new_graph)
+	degree_map = dict(networkx.degree(new_graph))
 	nodes = new_graph.nodes()
 
 	# Map graph from random model to new graph
@@ -1539,8 +1539,8 @@ def randomize_graph(graph, randomization_type, allow_self_edges = False):
         new_graph.add_edges_from([ (equivalences[current_edge[0]], equivalences[current_edge[1]], graph.get_edge_data(current_edge[0],current_edge[1])) for current_edge in graph.edges() ])
 
     elif randomization_type=="preserve_topology_and_node_degree": # shuffle_nodes_within_same_degree
-        nodes_by_degree = dict( (degree,[]) for degree in graph.degree().values() )
-        graph_degree = graph.degree()
+        nodes_by_degree = dict( (degree,[]) for u, degree in graph.degree() ) #.values()
+        graph_degree = dict(graph.degree())
         [ nodes_by_degree[graph_degree[node]].append(node) for node in graph_degree ]
         equivalences = {}
         for current_degree in nodes_by_degree.keys():
@@ -1553,9 +1553,9 @@ def randomize_graph(graph, randomization_type, allow_self_edges = False):
     elif randomization_type=="preserve_degree_distribution":
         for current_node1, current_node2 in graph.edges():
             new_graph.add_edge(current_node1, current_node2, graph.get_edge_data(current_node1, current_node2))
-        max_degree = sorted(graph.degree().values())[-1]
+        max_degree = sorted(zip(*list(graph.degree()))[1])[-1] #.values()
         nodes_by_degree = dict( (degree, {}) for degree in xrange(max_degree+1) )
-        graph_degree = graph.degree()
+        graph_degree = dict(graph.degree())
         [ nodes_by_degree[graph_degree[node]].setdefault(node) for node in graph_degree ]
         n_perturbation = random.randint(2*n_edge/3, n_edge) # Perturb at least 66% of the edges
         for i in xrange(n_perturbation):
@@ -1615,8 +1615,8 @@ def randomize_graph(graph, randomization_type, allow_self_edges = False):
         ## add edges as well
         for current_node1, current_node2 in graph.edges():
             new_graph.add_edge(current_node1, current_node2, graph.get_edge_data(current_node1, current_node2))
-        nodes_by_degree = dict( (degree,{}) for degree in graph.degree().values() )
-        graph_degree = graph.degree()
+        nodes_by_degree = dict( (degree,{}) for u, degree in graph.degree() )
+        graph_degree = dict(graph.degree())
         [ nodes_by_degree[graph_degree[node]].setdefault(node) for node in graph_degree ]
         
         #if n_edge < MIN_NUMBER_OF_PERTURBATION:
