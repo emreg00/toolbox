@@ -11,7 +11,7 @@ def main():
 
 
 def create_network_file(file_name, mapping_file, out_file, tissue=None):
-    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    geneid_to_name, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     parser = TsvReader.TsvReader(file_name, delim="\t")
     fields_to_include = ["evidence type", "symbol1", "symbol2"]
     if tissue is not None:

@@ -28,9 +28,13 @@ def main():
     #disease = "rheumatoid arthritis"
     #disease = "bone sarcoma"
     condition = None #"drug ineffective"
-    print choose_fda_drug_name(["Valaciclovir","Valacyclovir","valtrex","Valaciclovirum","Valztrex","Zelitrex","Pervioral","Actavis"])
-    mesh_name_to_ids = { "type 2 diabetes mellitus":1, "Diabetes Mellitus, Type 2":1, "Osteopenia":2, "Bone Diseases, Metabolic":3, "Pulmonary Disease, Chronic Obstructive":4 }
-    print convert_fda_name_to_mesh(disease, mesh_name_to_ids)
+    #print choose_fda_drug_name(["Valaciclovir","Valacyclovir","valtrex","Valaciclovirum","Valztrex","Zelitrex","Pervioral","Actavis"])
+    #mesh_name_to_ids = { "type 2 diabetes mellitus":1, "Diabetes Mellitus, Type 2":1, "Osteopenia":2, "Bone Diseases, Metabolic":3, "Pulmonary Disease, Chronic Obstructive":4 }
+    #print convert_fda_name_to_mesh(disease, mesh_name_to_ids)
+    d = get_counts_from_data(drug=None, disease=None, condition="toxicity")
+    print d.items()[:3]
+    d = get_counts_from_data(drug="acetaminophen", disease=None, condition=None)
+    print d.items()[:3]
     return
     print get_counts_for_drug(drug, disease, condition)
     #d = get_counts_from_data(drug, disease, condition)
@@ -200,29 +204,44 @@ def convert_fda_name_to_mesh(disease, mesh_name_to_ids):
 
 
 def get_data_helper(command, parameter, parameter2=None, parameter_effect=None, skip=0):
-    parameter = parameter.replace(" ", "+").replace("-", "+")
+    parameter = parameter.replace(" ", "+") #.replace("-", "+")
+    parameter = parameter.upper()
     if command == "drug":
-        txt = '%s:"%s"' % (FIELD_DRUG, parameter)
+        txt = '%s.exact:"%s"' % (FIELD_DRUG, parameter)
     elif command == "disease":
+	parameter = parameter.replace("-", "+")
         txt = '%s:"%s"' % (FIELD_DISEASE, parameter)
+    elif command == "drug-effect-all":
+	txt = '%s.exact:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_EFFECT)
+    elif command == "effect-drug-all":
+	txt = '%s.exact:"%s"&count=%s.exact' % (FIELD_EFFECT, parameter, FIELD_DRUG)
     elif command == "drug-disease":
 	assert parameter2 is not None
 	parameter2 = parameter2.replace(" ", "+").replace("-", "+")
-	txt = '%s:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2)
+	txt = '%s.exact:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2)
     elif command == "drug-disease-effect":
 	assert (parameter2 is not None and parameter_effect is not None)
-	parameter2 = parameter2.replace(" ", "+").replace("-", "+")
-	parameter_effect = parameter_effect.replace(" ", "+").replace("-", "+")
-	txt = '%s:"%s"+AND+%s:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect)
+	parameter2 = parameter2.replace(" ", "+") #.replace("-", "+")
+	parameter_effect = parameter_effect.replace(" ", "+") #.replace("-", "+")
+	txt = '%s.exact:"%s"+AND+%s:"%s"+AND+%s:"%s"' % (FIELD_DRUG, parameter, FIELD_DISEASE, parameter2, FIELD_EFFECT, parameter_effect)
     else:
         raise ValueError("Unknown command: " + command)
-    if API_USER_KEY is None:
-        url = 'https://api.fda.gov/drug/event.json?search=%s&limit=%d&skip=%d' % (txt, LIMIT, skip)
+    if skip is not None:
+	limit_txt = "&limit=%d&skip=%d" % (LIMIT, skip)
     else:
-        url = 'https://api.fda.gov/drug/event.json?api_key=%s&search=%s&limit=%d&skip=%d' % (API_USER_KEY, txt, LIMIT, skip)
+	limit_txt = "&limit=%d" % (LIMIT * 10)
+    if API_USER_KEY is None:
+	key_txt = "" 
+    else:
+	key_txt = "api_key=%s&" % API_USER_KEY 
+    url = 'https://api.fda.gov/drug/event.json?%ssearch=%s%s' % (key_txt, txt, limit_txt)
     #print url
     req = urllib2.Request(url)
-    response = urllib2.urlopen(req)
+    try:
+	response = urllib2.urlopen(req)
+    except:
+	print "Problem with url:", url
+	return
     while True:
 	try:
 	    response = json.load(response)
@@ -245,6 +264,11 @@ def get_data(command, parameter, parameter2=None, parameter_effect=None):
 	offset += limit
 	if len(result2["results"]) < limit:
 	    break
+    return result
+
+
+def get_count_data(command, parameter, parameter2=None, parameter_effect=None):
+    result = get_data_helper(command, parameter, parameter2, parameter_effect, skip=None)
     return result
 
 
@@ -273,12 +297,10 @@ def choose_fda_drug_name(names):
     return name, n
 
 
-def get_counts_from_data(drug, disease, condition=None):
-    if condition is None:
+def get_counts_from_data(drug=None, disease=None, condition=None):
+    if condition is None and drug is not None and disease is not None:
 	condition_to_count = {}
 	values = get_data("drug-disease", drug, disease)
-	flag_drug = False
-	flag_disease = False
 	for row in values:
 	    for row_inner in row["patient"]["reaction"]:
 		if "reactionmeddrapt" not in row_inner:
@@ -286,6 +308,24 @@ def get_counts_from_data(drug, disease, condition=None):
 		condition = row_inner["reactionmeddrapt"].lower()
 		i = condition_to_count.setdefault(condition, 0)
 		condition_to_count[condition] = i + 1
+	return condition_to_count
+    if disease is None and condition is None and drug is not None:
+	drug_to_count = {}
+	values = get_count_data("drug-effect-all", drug)
+	if values is None:
+	    return None
+	for row in values["results"]:
+	    condition = row["term"].lower()
+	    count = int(row["count"])
+	    drug_to_count[condition] = count
+	return drug_to_count
+    if disease is None and drug is None and condition is not None:
+	condition_to_count = {}
+	values = get_count_data("effect-drug-all", condition)
+	for row in values["results"]:
+	    condition = row["term"].lower()
+	    count = int(row["count"])
+	    condition_to_count[condition] = count
 	return condition_to_count
     values = get_data("drug-disease-effect", drug, disease, condition)
     i = 0
@@ -313,12 +353,12 @@ def get_counts_from_data(drug, disease, condition=None):
 
 def get_counts(command, parameter, parameter2=None, parameter_effect=None):
     parameter_org = parameter
-    parameter = parameter.replace(" ", "+").replace("-", "+")
+    parameter = parameter.replace(" ", "+") #.replace("-", "+")
     if parameter2 is not None:
 	parameter2_org = parameter2
-        parameter2 = parameter2.replace(" ", "+").replace("-", "+")
+        parameter2 = parameter2.replace(" ", "+") #.replace("-", "+")
     if parameter_effect is not None:
-        parameter_effect = parameter_effect.replace(" ", "+").replace("-", "+")
+        parameter_effect = parameter_effect.replace(" ", "+") #.replace("-", "+")
     if command == "drug": # number of safety reports for that drug
         txt = '%s:"%s"&count=%s.exact' % (FIELD_DRUG, parameter, FIELD_DRUG)
     elif command == "disease": # number of safety reports for that disease

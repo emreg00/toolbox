@@ -366,7 +366,7 @@ def get_drug_side_effect_subset(parameters, drug_to_side_effects):
 
 def get_side_effect_target_symbols(parameters, source = "sider", output_file=None):
     # Get gene id - name mapping
-    geneid_to_names, name_to_geneid = wrappers.get_geneid_symbol_mapping(parameters.get("id_mapping_file"))
+    geneid_to_name, name_to_geneid = wrappers.get_geneid_symbol_mapping(parameters.get("id_mapping_file"))
     # Get side effect targets
     side_effect_to_targets = get_side_effect_targets(parameters, source)
     # Create side effect target mapping file
@@ -376,8 +376,8 @@ def get_side_effect_target_symbols(parameters, source = "sider", output_file=Non
     for side_effect, targets in side_effect_to_targets.iteritems(): 
 	values = [] 
 	for target in targets:
-	    if target in geneid_to_names:
-		values.extend(list(geneid_to_names[target]))
+	    if target in geneid_to_name:
+		values.extend(list(geneid_to_name[target]))
 	values.sort()
 	side_effect_to_genes[side_effect] = set(values)
 	#print side_effect, len(targets), len(values)

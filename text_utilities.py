@@ -40,8 +40,12 @@ def in_keywords(txt, keywords):
     return flag, i
 
 
-def convert_to_R_string(txt, mapping=[(" ", "."), (",", ""), ("'", ""), ("-", ".")]):
-    #txt = txt.replace(",","").replace(" ", ".").replace("'", "")
+def convert_to_R_string(txt):
+    txt = txt.replace_chars(txt, mapping=[(" ", "."), (",", ""), ("'", ""), ("-", "."), ("/", ".")])
+    return txt
+
+
+def replace_chars(txt, mapping=[(" ", "_"), (",", ""), ("'", ""), ("-", "_"), ("/", "_")]):
     for a, b in mapping:
 	txt = txt.replace(a,b)
     return txt

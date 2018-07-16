@@ -9,26 +9,34 @@ def get_geneid_symbol_mapping(file_name):
     To parse Homo_sapiens.gene_info (trimmed to two colums) file from NCBI 
     Creating the file
     wget ftp://ftp.ncbi.nih.gov/gene/DATA/GENE_INFO/Mammalia/Homo_sapiens.gene_info.gz
-    zcat Homo_sapiens.gene_info.gz | cut -f 2,3 > geneid_to_symbol.txt
+    zcat Homo_sapiens.gene_info.gz | cut -f 2,3,5 > geneid_to_symbol.txt
+    Remove first line if need be (but keep header)
     """
     f = open(file_name)
     f.readline()
-    geneid_to_names = {}
+    geneid_to_name = {} # now contains only the official symbol
     name_to_geneid = {}
     for line in f:
-	geneid, symbol = line.split("\t")
-	geneid = geneid.strip()
+	words = line.strip("\n").split("\t")
+	if len(words) == 2:
+	    geneid, symbol = words
+	else:
+	    geneid, symbol, alternatives = words[:3]
+	    alternatives = alternatives.split("|")
+	geneid = geneid.strip() # strip in case mal formatted input file
 	symbol = symbol.strip()
 	if geneid == "" or symbol == "":
 	    continue
-	geneid_to_names.setdefault(geneid, set()).add(symbol) 
-	if symbol in name_to_geneid: 
-	    if int(geneid) >= int(name_to_geneid[symbol]):
-		continue
-	    print "Multiple geneids", name_to_geneid[symbol], geneid, symbol
-	name_to_geneid[symbol] = geneid
+	#geneid_to_names.setdefault(geneid, set()).add(symbol) 
+	geneid_to_name[geneid] = symbol
+	for symbol in [symbol] + alternatives: # added for synonym parsing
+	    if symbol in name_to_geneid: 
+		if int(geneid) >= int(name_to_geneid[symbol]):
+		    continue
+		print "Multiple geneids", name_to_geneid[symbol], geneid, symbol
+	    name_to_geneid[symbol] = geneid
     f.close()
-    return geneid_to_names, name_to_geneid
+    return geneid_to_name, name_to_geneid
 
 
 def get_unigene_to_geneids(file_name, prefix = "Hs."):

@@ -18,6 +18,13 @@ except:
 
 ##### Id mapping related #####
 
+def get_mapping(file_name, from_column = None, to_column = None, delim=None, one_to_one=True):
+    """
+    Assumes header, maps first column to the second
+    """
+    key_to_value = TsvReader.get_from_to_mapping(file_name, from_column = from_column, to_column = to_column, delim=delim, inner_delim = None, filter_column = None, exclude_value = None, include_value = None, one_to_one=one_to_one) 
+    return key_to_value
+
 def convert_to_geneid(file_name, id_type, id_mapping_file):
     """
     Expects a file where each line is a gene name / uniprot id
@@ -25,7 +32,7 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
     """
     genes = [ line.strip("\n") for line in open(file_name) ]
     if id_type == "symbol":
-	geneid_to_names, name_to_geneid = get_geneid_symbol_mapping(id_mapping_file)
+	geneid_to_name, name_to_geneid = get_geneid_symbol_mapping(id_mapping_file)
     elif id_type == "uniprot":
 	name_to_geneid = get_uniprot_to_id(id_mapping_file, uniprot_ids=genes, only_min=True, key_function=int)
     else:
@@ -49,8 +56,8 @@ def get_geneid_symbol_mapping(mapping_file):
     """
     id_mapping_file = %(data_dir)s/ncbi/geneid_to_symbol.txt
     """
-    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
-    return geneid_to_names, name_to_geneid
+    geneid_to_name, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    return geneid_to_name, name_to_geneid
 
 
 def get_mesh_id_mapping(desc_file, rel_file, dump_file = None):
@@ -349,8 +356,8 @@ def get_diseasome_genes(diseasome_file, nodes=None, network=None):
 
 
 def get_disgenet_genes(file_name):
-    disease_to_genes, disease_to_sources = parse_disgenet.get_disgenet_genes(file_name)
-    return disease_to_genes, disease_to_sources
+    disease_to_genes, disease_to_sources, cui_to_disease = parse_disgenet.get_disgenet_genes(file_name)
+    return disease_to_genes, disease_to_sources, cui_to_disease 
 
 
 def get_comorbidity_info(comorbidity_file, disease_ontology_file, mesh_dump, correlation_type="RR", only_significant=False):
@@ -830,6 +837,15 @@ def guildify_multiple(network_file, to_file, output_dir, from_file=None, out_fil
     if from_file is not None:
 	f.close()
     return target_to_source_score
+
+
+def get_scores(score_file):
+    """
+	Parses scores from a scoring file created by GUILD (node <whitespace> score), returns a dictionary where the values are floats.
+    """
+    nodes, dummy, node_to_score, dummy = network_utilities.get_nodes_and_edges_from_sif_file(file_name = score_file, store_edge_type = False, delim=None, data_to_float=True)
+    return node_to_score
+
 
 
 ### DIAMOnD related ###

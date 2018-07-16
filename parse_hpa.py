@@ -3,7 +3,7 @@ import parse_ncbi
 
 def main():
     mapping_file = "/home/emre/data/ncbi/geneid_to_symbol.txt"
-    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    geneid_to_name, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     file_name = "/home/emre/data/tissue/hpa_subcellular_location.tsv"
     geneid_to_localization = get_geneid_to_localization(file_name, mapping_file) # , only_extracellular=True
     print geneid_to_localization["8648"] # NCOA1
@@ -21,7 +21,7 @@ def get_geneid_to_localization(file_name, mapping_file, only_extracellular=False
     Some other terms: Vesicles (GO:0043231);Nuclear bodies (GO:0016604);Nucleoplasm (GO:0005654);Cytosol (GO:0005829);Nucleoli (GO:0005730);Mitochondria (GO:0005739);Cell Junctions (GO:0030054);Endoplasmic reticulum (GO:0005783);Centrosome (GO:0005813);Nucleoli fibrillar center (GO:0001650);Golgi apparatus (GO:0005794);Nuclear speckles (GO:0016607)
     Reliability types: Uncertain | Approved | Supported | Enhanced
     """
-    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    geneid_to_name, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     geneid_to_localization = {}
     ids_unmatched = set()
     f = open(file_name)
@@ -54,7 +54,7 @@ def get_geneid_to_predicted_localization(file_name_membrane, file_name_secreted,
     Relevant protein classes: Predicted secreted proteins | Predicted membrane proteins
     Note that evidence and reliability are for experimental characterization
     """
-    geneid_to_names, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
+    geneid_to_name, name_to_geneid = parse_ncbi.get_geneid_symbol_mapping(mapping_file)
     geneid_to_localization = {}
     ids_unmatched = set()
     f = open(file_name_membrane)

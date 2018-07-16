@@ -1129,6 +1129,16 @@ def get_subgraph(G, nodes):
     """
     return G.subgraph(nodes)
 
+
+def is_subgraph(G, H):
+    """
+	Checks whether G is a subgraph of H, that is whether all the edges of G belong to H
+    """
+    edges1 = set(G.edges())
+    edges2 = set(H.edges())
+    return len(edges1) == len(edges1 & edges2)
+
+
 def merge_graphs(G, H):
     """
 	NetworkX union method wrapper
@@ -1175,12 +1185,14 @@ def create_network_from_sif_file(network_file_in_sif, use_edge_data = False, del
 	g.add_edges_from(setEdge)
     return g
 
-def create_network_from_two_column_file(network_file_in_two_column, delim = None):
+
+def create_network_from_first_two_columns(network_file, delim = None):
     g = create_graph()
-    for line in open(network_file_in_two_column):
-	id1, id2 = line.strip().split(delim)
+    for line in open(network_file):
+	id1, id2 = line.strip().split(delim)[:2]
 	g.add_edge(id1, id2)
     return g
+
 
 def output_node_info(g, node_to_label, out_file, default_label="", node_to_name=None):
     f = open(out_file, 'w')
