@@ -39,7 +39,7 @@ def convert_to_geneid(file_name, id_type, id_mapping_file):
 	raise ValueError("Uknown id type: %s" % id_type)
     geneids = set([ name_to_geneid[gene] for gene in genes if gene in name_to_geneid ])
     genes_non = set([ gene for gene in genes if gene not in name_to_geneid ])
-    print genes_non
+    print "Not found genes:", genes_non
     return geneids
 
 
@@ -884,7 +884,7 @@ def get_diamond_genes(network_file, seeds, file_name, only_lcc=True):
 
 ### Functional enrichment related ###
 
-def check_functional_enrichment(id_list, background_id_weights = None, id_type = "genesymbol", species = "Homo sapiens", mode="unordered", evidences = None, out_file_name = None):
+def check_functional_enrichment(id_list, background_id_weights = None, id_type = "genesymbol", species = "Homo sapiens", mode="unordered", evidences = None, out_file_name = None, tex_format = False):
     """
     id_type = "geneid" # "uniprotacession" # "genesymbol"
     evidences = ['EXP', 'IDA', 'IEP', 'IGI', 'IMP', 'ISA', 'ISM', 'ISO', 'ISS', 'IGC'] # 'IPI'
@@ -897,7 +897,7 @@ def check_functional_enrichment(id_list, background_id_weights = None, id_type =
     else:
 	from sys import stdout 
 	f_output = stdout.write
-    return functional_enrichment.check_functional_enrichment(id_list, background_id_weights, id_type, f_output, species = species, mode = mode, tex_format = False, support = evidences, associations = None) 
+    return functional_enrichment.check_functional_enrichment(id_list, background_id_weights, id_type, f_output, species = species, mode = mode, tex_format = tex_format, support = evidences, associations = None) 
 
 
 

@@ -35,9 +35,9 @@ class TsvReader(FormattedFileProcessor):
 	    >>> reduce(lambda x,y: x+y, [["P12345", "Q23W42"], ["Q23W42"]])
 	    >>> ['P12345', 'Q23W42', 'Q23W42']
 	"""
-	file = open(self.input_file_name)
+	f = open(self.input_file_name)
 	# Read header
-	line = file.readline()
+	line = f.readline()
 	delim = self.delim
 	#if self.quotation is not None and self.delim is not None:
 	#    delim = self.quotation + self.delim + self.quotation
@@ -47,7 +47,7 @@ class TsvReader(FormattedFileProcessor):
 	    fields_to_include = []
 	    fields_to_include.extend(cols)
 	else:
-	    fields_to_include = [ f.lower() for f in fields_to_include ]
+	    fields_to_include = [ x.lower() for x in fields_to_include ]
 	    first_column = fields_to_include[0]
 	fields_to_include.remove(first_column) # this will be stored as key
 	columns = dict(zip(cols, range(len(cols))))
@@ -56,7 +56,7 @@ class TsvReader(FormattedFileProcessor):
 		raise Exception("merge_inner_values requires that inner_delim is defined!")
 	id_to_values = {}
 	line_prev = line
-	line = file.readline()
+	line = f.readline()
 	if isinstance(keys_to_include, list):
 	    keys_to_include = set(keys_to_include)
 	while line:
@@ -66,10 +66,10 @@ class TsvReader(FormattedFileProcessor):
 		if keys_to_include is None or id_ in keys_to_include:
 		    new_vals = []
 		    if merge_inner_values:
-			for f in fields_to_include:
-			    new_vals.extend(map(lambda x: x.strip().strip(self.quotation), vals[columns[f]].split(self.inner_delim)))
+			for x in fields_to_include:
+			    new_vals.extend(map(lambda x: x.strip().strip(self.quotation), vals[columns[x]].split(self.inner_delim)))
 		    else:
-			new_vals = [vals[columns[f]].strip(self.quotation) for f in fields_to_include]
+			new_vals = [vals[columns[x]].strip(self.quotation) for x in fields_to_include]
 		    id_to_values.setdefault(id_, []).append(new_vals)
 	    except:  
 		print line_prev, line 
@@ -77,8 +77,8 @@ class TsvReader(FormattedFileProcessor):
 		traceback.print_exc()
 		break
 	    line_prev = line
-	    line = file.readline()
-	file.close()
+	    line = f.readline()
+	f.close()
 	#print columns, "\n", id_to_values.items()[0]
 	column_to_index = dict(zip(fields_to_include, range(len(fields_to_include))))
 	#print "End:", columns
@@ -95,20 +95,20 @@ class TsvReader(FormattedFileProcessor):
 			    if False, returns list of values as list in the dictionary (each list element corresponding to value list of distinct entries)
 	    keys_to_include: use only lines whose value of the first column is inside this set. Set None for including all the lines in the file
 	"""
-	file = open(self.input_file_name)
-	line = file.readline()
+	f = open(self.input_file_name)
+	line = f.readline()
 	cols = [ c.lower() for c in line.strip("\n").split('\t') ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	else:
-	    fields_to_include = [ f.lower() for f in fields_to_include ]
+	    fields_to_include = [ x.lower() for x in fields_to_include ]
 	    first_column = fields_to_include[0]
 	columns = dict(zip(cols, range(len(cols))))
 	#print "Start:", columns
 	id_to_value = {}
 	i=0
 	line_prev = line
-	line = file.readline()
+	line = f.readline()
 	vals = line.strip("\n").split('\t')
 	#print vals
 	while line:
@@ -124,11 +124,11 @@ class TsvReader(FormattedFileProcessor):
 				id_to_value.setdefault(id_, []).append(vals)
 			else:
 			    if overwrite_keys:
-				id_to_value[id_] = [ vals[columns[f]] for f in fields_to_include]
+				id_to_value[id_] = [ vals[columns[x]] for x in fields_to_include]
 			    else:
-				id_to_value.setdefault(id_, []).append( [vals[columns[f]] for f in fields_to_include] )
+				id_to_value.setdefault(id_, []).append( [vals[columns[x]] for x in fields_to_include] )
 		    else:
-			out_method("%s\n" % "\t".join([ vals[columns[f]] for f in fields_to_include ]))
+			out_method("%s\n" % "\t".join([ vals[columns[x]] for x in fields_to_include ]))
 	    except: #Exception, e: 
 	    	#print "In: ", __file__, e, vals
 		print line_prev, line 
@@ -138,8 +138,8 @@ class TsvReader(FormattedFileProcessor):
 	    #if i > 20:
 	    #	break
 	    line_prev = line
-	    line = file.readline()
-	file.close()
+	    line = f.readline()
+	f.close()
 	#print columns, "\n", id_to_value.items()[0]
 	if out_method is None:
 	    if fields_to_include is not None:

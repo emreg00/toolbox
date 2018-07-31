@@ -1,12 +1,50 @@
-dir_name = "/home/emre/arastirma/netzcore/data/ctd/"
+import TsvReader
+
 
 def main():
-    #disease_to_values = parse_CTD()
-    #get_inference_scores_for_disease(disease_to_values, "alzheimer")
-    get_nc_scores_for_disease("alzheimer")
-    get_nc_scores_for_disease("diabetes")
-    get_nc_scores_for_disease("aids")
+    dir_name = "/home/emre/arastirma/netzcore/data/ctd/"
+    #disease_to_values = parse_CTD(dir_name)
+    #get_inference_scores_for_disease(dir_name, disease_to_values, "alzheimer")
+    get_nc_scores_for_disease(dir_name, "alzheimer")
+    get_nc_scores_for_disease(dir_name, "diabetes")
+    get_nc_scores_for_disease(dir_name, "aids")
     return
+
+
+def get_phenotype_to_gene_mapping_for_chemicals(file_name, drug_name, anatomies_accepted, go_id_to_genes=None):
+    parser = TsvReader.TsvReader(file_name, delim="\t", inner_delim=None)
+    header_to_index, key_to_values = parser.read(fields_to_include=["Chemical", "Phenotype", "Phenotype ID", "Organisms", "Anatomy", "Inference Network", "Reference Count"])
+    phenotype_to_values = {}
+    anatomies_accepted = set(anatomies_accepted)
+    anatomies_all = set()
+    phenotypes_all = set()
+    for chemical, values in key_to_values.iteritems():
+	for vals in values:
+	    phenotype, go_id, organisms, anatomies, genes, count = vals
+	    anatomies = set(anatomies.split("|"))
+	    anatomies_all |= anatomies
+	    genes = set(genes.split("|"))
+	    count = int(count)
+	    if chemical != drug_name:
+		continue
+	    if "Homo sapiens" not in organisms.split("|"):
+		continue
+	    #if count < 1: # Pubmed cutoff
+	    #	continue
+	    if len(anatomies_accepted & anatomies) < 1:
+		continue
+	    #print phenotype, go_id, len(genes)
+	    phenotypes_all.add(phenotype)
+	    if phenotype in phenotype_to_values:
+		if phenotype_to_values[phenotype][0] != go_id or phenotype_to_values[phenotype][1] != genes:
+		    print "Overwriting", phenotype, phenotype_to_values[phenotype][0], go_id
+	    #if go_id_to_genes is not None and go_id in go_id_to_genes and genes != go_id_to_genes[go_id]:
+		#print len(genes), len(go_id_to_genes[go_id]), len(genes & go_id_to_genes[go_id])
+	    phenotype_to_values[phenotype] = (go_id, genes)
+    #print anatomies_all
+    #print phenotypes_all 
+    return phenotype_to_values 
+
 
 def parse_CTD():
     disease_to_genes = {}
@@ -62,7 +100,7 @@ def get_netcombo_scores(disease):
 	node_to_score[gene] = score
     return node_to_score
 
-def get_inference_scores_for_disease(disease_to_values, disease_name):
+def get_inference_scores_for_disease(dir_name, disease_to_values, disease_name):
     node_to_score = get_netcombo_scores()
     f = open(dir_name + "%s.dat" % disease_name, 'w')
     f.write("gene i_score is_direct nc_score\n")
@@ -88,7 +126,7 @@ def get_inference_scores_for_disease(disease_to_values, disease_name):
     f.close()
     return
 
-def get_nc_scores_for_disease(disease):
+def get_nc_scores_for_disease(dir_name, disease):
     node_to_score = get_netcombo_scores(disease)
     if disease == "aids":
 	disease = "hiv"

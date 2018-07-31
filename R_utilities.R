@@ -467,24 +467,45 @@ visualize.pca.grouped.by.sample.type <- function(expr, sample.mapping, states, t
 }
 
 
-draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size=txt.size) {
+draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size=txt.size, d.label=NULL) {
     if(!is.null(similarity.conversion)) {
 	d = get.similarity(d, similarity.conversion) #"binary" "euclidian"
     }
     if(plot.type == "tile") {
 	# Code refactored from https://journocode.com/2016/03/13/similarity-and-distance-in-data-part-2/
 	d$name = rownames(d)
-	f = melt(d, id.vars = "name")
-	# Order by name
-	labels = rownames(d)[order(rownames(d))]
-	f$name = factor(f$name, labels)
-	f$variable = factor(f$variable, rev(labels))
-	f = plyr::arrange(f, variable, plyr::desc(name))
-	p = ggplot(f, aes(name, variable))
+	f = melt(d, id.vars = "name")	
+	if(!is.null(similarity.conversion)) {
+	    # Order by name
+	    labels = rownames(d)[order(rownames(d))]
+	    f$name = factor(f$name, labels)
+	    f$variable = factor(f$variable, rev(labels))
+	    f = plyr::arrange(f, variable, plyr::desc(name))
+	    if(!is.null(d.label)) { 
+		stop("External labels are not supported for similarity!")
+	    }
+	} else {
+	    labels = levels(f$variable[order(f$variable)])
+	    f$variable = factor(f$variable, rev(labels))
+	    if(!is.null(d.label)) { 
+		d.label$name = rownames(d.label)
+		d.label = melt(d.label, id.vars = "name")
+		f$label = d.label$value
+	    }
+	}
+	#print(f)
+	if(!is.null(d.label)) { 
+	    p = ggplot(f, aes_string("name", "variable", label="label"))
+	} else {
+	    p = ggplot(f, aes(name, variable))
+	}
 	p = p + geom_tile(aes(fill=value), colour = "white")
 	p = p + scale_fill_gradient(low="white", high="red") #low = "#b7f7ff", high = "#0092a3")
 	p = p + theme_light(base_size = txt.size) + labs(x = "", y = "") + guides(fill=guide_legend(title=NULL)) 
 	p = p + scale_x_discrete(expand = c(0, 0)) + scale_y_discrete(expand = c(0, 0))
+	if(!is.null(d.label)) { 
+	    p = p + geom_text(size = txt.size/2)
+	}
 	p = p + theme(axis.ticks = element_blank(), axis.text.x = element_text(size = txt.size * 0.8, angle = 310, hjust = 0), 
 		  axis.text.y = element_text(size = txt.size * 0.8))
     } else if(plot.type == "simplot") { 

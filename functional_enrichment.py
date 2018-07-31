@@ -39,9 +39,11 @@ def check_functional_enrichment(subset_gene_ids, gene_weights, id_type, output_m
 	    id_type = "hgnc_symbol"
 	elif species == "Mus musculus":
 	    id_type = "mgi_symbol"
+	elif species == "Rattus norvegicus":
+	    id_type = "rgd_symbol"
 	else:
 	    print client_funcassociate.available_namespaces(species=[species]) 
-	    raise ValueError("Currently human and mouse symbols are supported!")
+	    raise ValueError("Currently human, mouse and rat symbols are supported!")
     elif id_type == "uniprot": # "uniprotaccession"
 	#id_type = "uniprot_accession"
 	id_type = "uniprot_swissprot"
