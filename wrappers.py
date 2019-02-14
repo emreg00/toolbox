@@ -221,7 +221,7 @@ def get_expression_info(gexp_file, process=None, delim=',', quote='"', R_header=
     return gexp, gene_to_idx, cell_line_to_idx
 
 
-def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_type = "GeneID"):
+def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_logfc=0.585, n_top=None, id_type = "GeneID"):
     """
     For parsing DE file generated using R PEPPER package
     """
@@ -247,7 +247,7 @@ def get_de_genes(file_name, cutoff_adj = 0.05, cutoff_fc=1.5, n_top=None, id_typ
 		continue
 	    fc = float(val[header_to_idx["logfc"]])
 	    if float(pval) <= cutoff_adj:
-		if abs(fc) >= cutoff_fc: # fc >= cutoff_fc: 
+		if abs(fc) >= cutoff_logfc: 
 		    include = True
 		if fc >= 0: 
 		    positive = True
@@ -664,9 +664,9 @@ def calculate_separation_proximity(network, nodes_from, nodes_to, nodes_from_ran
 
 
 def get_separation(network, nodes_from, nodes_to, lengths=None):
-    dAA = numpy.mean(get_separation_within_set(network, nodes_from))
-    dBB = numpy.mean(get_separation_within_set(network, nodes_to))
-    dAB = numpy.mean(get_separation_between_sets(network, nodes_from, nodes_to))
+    dAA = numpy.mean(get_separation_within_set(network, nodes_from, lengths))
+    dBB = numpy.mean(get_separation_within_set(network, nodes_to, lengths))
+    dAB = numpy.mean(get_separation_between_sets(network, nodes_from, nodes_to, lengths))
     d = dAB - (dAA + dBB) / 2.0
     return d
 

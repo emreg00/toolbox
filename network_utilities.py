@@ -56,11 +56,15 @@ def main():
     g2=prune_graph_at_given_percentage(g,10)
     return
 
-def create_graph():
+def create_graph(directed=False):
     """
         Creates & returns a graph
     """
-    return networkx.Graph()
+    if directed:
+	g = networkx.DiGraph()
+    else:
+	g = networkx.Graph()
+    return g
 
 def create_graph_with_same_type(G):
     return networkx.create_empty_copy(G)
@@ -1369,6 +1373,7 @@ def get_nodes_and_edges_from_sif_file(file_name, store_edge_type = False, delim=
     setEdge = set()
     dictNode = {}
     dictEdge = {}
+    flag = False
     f=open(file_name)
     for line in f:
 	if delim is None:
@@ -1383,7 +1388,9 @@ def get_nodes_and_edges_from_sif_file(file_name, store_edge_type = False, delim=
 	    else:
 		score = words[1]
             dictNode[id1] = score
-        elif len(words) == 3: 
+        elif len(words) >= 3: 
+	    if len(words) > 3:
+		flag = True
             id2 = words[2]
             setNode.add(id2)
 	    setEdge.add((id1, id2))
@@ -1399,6 +1406,8 @@ def get_nodes_and_edges_from_sif_file(file_name, store_edge_type = False, delim=
         dictNode = None
     if len(dictEdge) == 0:
         dictEdge = None
+    if flag:
+	print "Warning: Ignored extra columns in the file!"
     return setNode, setEdge, dictNode, dictEdge
 
 

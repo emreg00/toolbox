@@ -16,8 +16,8 @@ cb.set <- brewer.pal(8,"Set1")
 cb.pastel <- brewer.pal(8,"Pastel1")
 cb.accent <- brewer.pal(8,"Accent")
 cb.dark = brewer.pal(8, "Dark2")
-cb.blues = brewer.pal(9,"Blues")
-cb.reds = brewer.pal(9,"Reds")
+cb.blues = brewer.pal(3,"Blues")
+cb.reds = brewer.pal(3,"Reds")
 
 txt.size = 18
 
@@ -457,7 +457,7 @@ visualize.pca.grouped.by.sample.type <- function(expr, sample.mapping, states, t
 	if(endsWith(out.file, "jpg")) {
 	    jpeg(out.file, width = 4, height = 4, units = 'in', res=300)
 	} else {
-	    pdf(out.file)
+	    pdf(out.file, width=10, height=6)
 	}
 	print(p)
 	dev.off()
@@ -467,20 +467,23 @@ visualize.pca.grouped.by.sample.type <- function(expr, sample.mapping, states, t
 }
 
 
-draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size=txt.size, d.label=NULL) {
+draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size=txt.size, d.label=NULL, id.col=NULL, flip=F) {
     if(!is.null(similarity.conversion)) {
 	d = get.similarity(d, similarity.conversion) #"binary" "euclidian"
     }
     if(plot.type == "tile") {
 	# Code refactored from https://journocode.com/2016/03/13/similarity-and-distance-in-data-part-2/
-	d$name = rownames(d)
-	f = melt(d, id.vars = "name")	
+	if(is.null(id.col)) {
+	    d$name = rownames(d)
+	    id.col = "name"
+	}
+	f = melt(d, id.vars = id.col)	
 	if(!is.null(similarity.conversion)) {
 	    # Order by name
 	    labels = rownames(d)[order(rownames(d))]
-	    f$name = factor(f$name, labels)
+	    f[[id.col]] = factor(f[[id.col]], labels)
 	    f$variable = factor(f$variable, rev(labels))
-	    f = plyr::arrange(f, variable, plyr::desc(name))
+	    f = plyr::arrange(f, variable, plyr::desc(!!sym(id.col)))
 	    if(!is.null(d.label)) { 
 		stop("External labels are not supported for similarity!")
 	    }
@@ -488,21 +491,24 @@ draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size
 	    labels = levels(f$variable[order(f$variable)])
 	    f$variable = factor(f$variable, rev(labels))
 	    if(!is.null(d.label)) { 
-		d.label$name = rownames(d.label)
-		d.label = melt(d.label, id.vars = "name")
+		d.label[[id.col]] = rownames(d.label)
+		d.label = melt(d.label, id.vars = id.col)
 		f$label = d.label$value
 	    }
 	}
 	#print(f)
 	if(!is.null(d.label)) { 
-	    p = ggplot(f, aes_string("name", "variable", label="label"))
+	    p = ggplot(f, aes_string(id.col, "variable", label="label"))
 	} else {
-	    p = ggplot(f, aes(name, variable))
+	    p = ggplot(f, aes_string(id.col, "variable"))
 	}
 	p = p + geom_tile(aes(fill=value), colour = "white")
 	p = p + scale_fill_gradient(low="white", high="red") #low = "#b7f7ff", high = "#0092a3")
 	p = p + theme_light(base_size = txt.size) + labs(x = "", y = "") + guides(fill=guide_legend(title=NULL)) 
 	p = p + scale_x_discrete(expand = c(0, 0)) + scale_y_discrete(expand = c(0, 0))
+	if(flip) {
+	    p = p + coord_flip() 
+	}
 	if(!is.null(d.label)) { 
 	    p = p + geom_text(size = txt.size/2)
 	}
@@ -510,6 +516,9 @@ draw.heatmap<-function(d, plot.type="tile", similarity.conversion=NULL, txt.size
 		  axis.text.y = element_text(size = txt.size * 0.8))
     } else if(plot.type == "simplot") { 
 	p = simplot.mod(d)
+    } else if(plot.type == "pheatmap") { 
+	library(pheatmap)
+	p = pheatmap(d, fontsize = txt.size)
     } else if(plot.type == "heatmap2") { 
 	library(gplots)
 	val.cols = c("white", cb.reds)

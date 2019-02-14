@@ -75,7 +75,7 @@ class TsvReader(FormattedFileProcessor):
 		print line_prev, line 
 		import traceback
 		traceback.print_exc()
-		break
+		return None, None #break
 	    line_prev = line
 	    line = f.readline()
 	f.close()
@@ -179,6 +179,7 @@ def get_from_to_mapping(file_name, from_column = None, to_column = None, delim="
     if inner_delim is not None:
 	merge_inner_values = True
     header_to_index, key_to_values = reader.read(fields_to_include = fields_to_include, merge_inner_values = merge_inner_values)
+    #print header_to_index, key_to_values.items()[:4]
     if len(header_to_index) > 2:
 	#raise ValueError("FROM and TO columns are required for files that contain more than two columns!")
 	print "Assuming the first column as FROM and the second column as TO fields!"
