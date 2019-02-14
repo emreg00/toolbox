@@ -41,7 +41,7 @@ class TsvReader(FormattedFileProcessor):
 	delim = self.delim
 	#if self.quotation is not None and self.delim is not None:
 	#    delim = self.quotation + self.delim + self.quotation
-	cols = [ c.lower().strip(self.quotation) for c in line.strip("\n").split(delim) ]
+	cols = [ c.lower().strip(self.quotation) for c in line.strip("\n").strip("\r").split(delim) ]
 	if fields_to_include is None:
 	    first_column = cols[0]
 	    fields_to_include = []
