@@ -533,21 +533,22 @@ def overlap_significance(geneids1, geneids2, nodes, method="hyper"):
 
 ##### Proximity related #####
 
-def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None):
+def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, bins=None, n_random=1000, min_bin_size=100, seed=452456, lengths=None, distance="closest"):
     """
     Calculate proximity from nodes_from to nodes_to
     If degree binning or random nodes are not given, they are generated
     lengths: precalculated shortest path length dictionary
     """
-    #distance = "closest"
     #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
-    #d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
     nodes_network = set(network.nodes())
     nodes_from = set(nodes_from) & nodes_network 
     nodes_to = set(nodes_to) & nodes_network
     if len(nodes_from) == 0 or len(nodes_to) == 0:
 	return None # At least one of the node group not in network
-    d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
+    if distance != "closest":
+        d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
+    else:
+        d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     if bins is None and (nodes_from_random is None or nodes_to_random is None):
 	bins = network_utilities.get_degree_binning(network, min_bin_size, lengths) # if lengths is given, it will only use those nodes
     if nodes_from_random is None:
@@ -558,8 +559,10 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     values = numpy.empty(len(nodes_from_random)) #n_random
     for i, values_random in enumerate(random_values_list):
 	nodes_from, nodes_to = values_random
-	#values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
-	values[i] = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
+        if distance != "closest":
+            values[i] = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
+        else:
+            values[i] = calculate_closest_distance(network, nodes_from, nodes_to, lengths)
     #pval = float(sum(values <= d)) / len(values) # needs high number of n_random
     m, s = numpy.mean(values), numpy.std(values)
     if s == 0:
