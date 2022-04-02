@@ -30,6 +30,7 @@
 
 import networkx, random, copy
 import os, cPickle, numpy
+import types
 
 try:
     from scipy.stats import rankdata
@@ -135,6 +136,9 @@ def dumper(func):
 		# remove dump_file argument
 		#print "dumping", dump_file, kwargs_mod
 		val = func(*args_mod, **kwargs_mod)
+                if isinstance(val, types.GeneratorType): # newer versions of networkx returns iterators
+                    val_new = {source: target_dict for source, target_dict in val}
+                    val = val_new
 		cPickle.dump(val, open(dump_file, 'w'))
 	else:
 	    #print "running", kwargs_mod

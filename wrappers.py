@@ -539,13 +539,13 @@ def calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, n
     If degree binning or random nodes are not given, they are generated
     lengths: precalculated shortest path length dictionary
     """
-    #lengths = network_utilities.get_shortest_path_lengths(network, "../data/toy.sif.pcl")
     nodes_network = set(network.nodes())
     nodes_from = set(nodes_from) & nodes_network 
     nodes_to = set(nodes_to) & nodes_network
     if len(nodes_from) == 0 or len(nodes_to) == 0:
 	return None # At least one of the node group not in network
     if distance != "closest":
+        lengths = network_utilities.get_shortest_path_lengths(network, "temp_n%d_e%d.sif.pcl" % (len(nodes_network), network.number_of_edges()))
         d = network_utilities.get_separation(network, lengths, nodes_from, nodes_to, distance, parameters = {})
     else:
         d = calculate_closest_distance(network, nodes_from, nodes_to, lengths)

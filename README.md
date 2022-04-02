@@ -122,18 +122,24 @@ See `calculate_proximity` method in [wrappers.py](wrappers.py)  for calculating 
 
 `calculate_proximity(network, nodes_from, nodes_to, nodes_from_random=None, nodes_to_random=None, n_random=1000, min_bin_size=100, seed=452456)`
 
-For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy network (given below):
+For instance, to calculate the proximity from (A, C) to (B, D, E) in a toy network (given below), you can use the following code. Note that default proximity calculation uses "closest" measure and calculates the shortest pahts on the fly. On the other hand, if a different measure (such as "shortest" used), the all pairs shortest paths are calculated first and stored in a pickled file starting with "temp\_" prefix in the working path. If you would like to use a pre-defined shortest path length dictionary in the default version (with "closest" measure), the dictionary can be provided via "lengths" parameter. 
 
 ```python
 >>> from toolbox import wrappers
 >>> file_name = "toy.sif"
 >>> network = wrappers.get_network(file_name, only_lcc = True)
+Shrinking network to its LCC 11 15
+Final shape: 11 15
 >>> nodes_from = ["A", "C"]
 >>> nodes_to = ["B", "D", "E"]
->>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2)
+>>> # Calculate proximity using default measure ("closest") 
+>>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2, seed=452456)
 >>> print (d, z, (mean, sd))
-(1.0, 0.97823676194805476, (0.75549999999999995, 0.24993949267772786))
->>>
+(1.0, 1.3870748387117167, (0.671, 0.2371897974197035))
+>>> # Calculate proximity using "shortest" measure, all pair shortest path lengths are stored in a temp file
+>>> d, z, (mean, sd) = wrappers.calculate_proximity(network, nodes_from, nodes_to, min_bin_size = 2, seed=452456, distance="shortest")
+>>> print (d, z, (mean, sd))
+(1.3333333333333335, 0.43423257023103884, (1.2721666666666667, 0.14086153563773976))
 ```
 
 Toy network (toy.sif):
